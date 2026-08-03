@@ -33,6 +33,11 @@
     log: $("log"),
     statusLine: $("statusLine"),
     notice: $("encodeNotice"),
+    updatesModal: $("updatesModal"),
+    updatesList: $("updatesList"),
+    updNowBtn: $("updNowBtn"),
+    updLaterBtn: $("updLaterBtn"),
+    checkUpdatesBtn: $("checkUpdatesBtn"),
   };
 
   const state = {
@@ -45,6 +50,8 @@
     formErr: null,
     pastedTitle: null,
     titleFetching: false,
+    updateTools: null,
+    updating: false,
   };
 
   // The config returned by boot(), kept so the language change handler can
@@ -314,6 +321,12 @@
       case "resolveStatus":
         applyResolveStatus(ev.ok, ev.message);
         break;
+      case "updates":
+        renderUpdates(ev.tools);
+        break;
+      case "updateProgress":
+        updateUpdateRow(ev.tool, ev.state, ev.pct);
+        break;
     }
   }
 
@@ -384,6 +397,138 @@
 
   function applyResolveStatus(ok, message) {
     setToken("stResolve", ok, message || "");
+  }
+
+  // ----------------------------------------------- binary update modal ---
+  function hideUpdates() {
+    if (el.updatesModal) el.updatesModal.setAttribute("hidden", "");
+  }
+
+  function updateUpdateRow(toolId, state, pct) {
+    const ul = el.updatesList;
+    if (!ul) return;
+    for (const row of ul.querySelectorAll(".upd-row")) {
+      if (row.dataset.tool !== toolId) continue;
+      const st = row.querySelector(".upd-state");
+      if (!st) return;
+      st.classList.remove("downloading", "done", "failed");
+      if (state === "downloading") {
+        st.textContent = t("updates.stateDownloading", [pct == null ? 0 : pct]);
+        st.classList.add("downloading");
+      } else if (state === "extracting") {
+        st.textContent = t("updates.stateExtracting");
+        st.classList.add("downloading");
+      } else if (state === "applying") {
+        st.textContent = t("updates.stateApplying");
+        st.classList.add("downloading");
+      } else if (state === "done") {
+        st.textContent = t("updates.stateDone");
+        st.classList.add("done");
+      } else if (state === "failed") {
+        st.textContent = t("updates.stateFailed");
+        st.classList.add("failed");
+      }
+    }
+  }
+
+  function renderUpdates(tools) {
+    if (!tools || !Array.isArray(tools)) return;
+    state.updateTools = tools;
+    const outdated = tools.filter((tool) => tool.outdated);
+    if (!outdated.length) {
+      hideUpdates();
+      return;
+    }
+    const ul = el.updatesList;
+    if (!ul) return;
+    ul.innerHTML = "";
+    for (const tool of tools) {
+      const li = document.createElement("li");
+      li.className = "upd-row" + (tool.outdated ? " outdated" : "");
+      li.dataset.tool = tool.id;
+
+      const name = document.createElement("span");
+      name.className = "upd-name";
+      name.textContent = tool.id;
+
+      const vers = document.createElement("span");
+      vers.className = "upd-vers";
+      vers.textContent = tool.outdated
+        ? (tool.installed || "?") + " → " + (tool.latest || "?")
+        : (tool.installed || t("updates.unknown"));
+
+      const st = document.createElement("span");
+      st.className = "upd-state";
+      if (tool.outdated && !tool.bundled) st.textContent = t("updates.onPath");
+      else if (tool.err) st.textContent = t("updates.unknown");
+      else if (!tool.outdated) st.textContent = t("updates.upToDate");
+      else st.textContent = "";
+
+      li.appendChild(name);
+      li.appendChild(vers);
+      li.appendChild(st);
+      ul.appendChild(li);
+    }
+    el.updatesModal.removeAttribute("hidden");
+    if (el.updNowBtn) el.updNowBtn.disabled = state.updating || state.running;
+    if (el.updLaterBtn) el.updLaterBtn.disabled = state.updating;
+  }
+
+  function wireUpdateUi() {
+    if (el.checkUpdatesBtn) {
+      el.checkUpdatesBtn.addEventListener("click", () => {
+        const api = pyApi();
+        if (!api || !api.checkUpdates || state.running) return;
+        const btn = el.checkUpdatesBtn;
+        btn.disabled = true;
+        api.checkUpdates({ explicit: true })
+          .then((res) => {
+            if (res && res.tools) {
+              renderUpdates(res.tools);
+              if (!res.tools.some((tool) => tool.outdated)) {
+                log(t("updates.noUpdate"), "ok");
+              }
+            } else if (res && res.skipped) {
+              log(t("updates.noUpdate"), "ok");
+            }
+          })
+          .catch((e) => {
+            log(t("status.couldNotStart", [t("settings.checkUpdates")]) + ": " +
+              (e && e.message ? e.message : e), "err");
+          })
+          .then(() => { btn.disabled = false; });
+      });
+    }
+    if (el.updNowBtn) {
+      el.updNowBtn.addEventListener("click", () => {
+        if (!state.updateTools || state.updating || state.running) return;
+        const api = pyApi();
+        if (!api || !api.updateTools) return;
+        const ids = state.updateTools
+          .filter((tool) => tool.outdated && tool.bundled)
+          .map((tool) => tool.id);
+        if (!ids.length) { hideUpdates(); return; }
+        state.updating = true;
+        el.updNowBtn.disabled = true;
+        el.updLaterBtn.disabled = true;
+        api.updateTools(ids)
+          .catch((e) => {
+            log(t("updates.stateFailed") + ": " + (e && e.message ? e.message : e), "err");
+          })
+          .then(() => {
+            state.updating = false;
+            el.updNowBtn.disabled = false;
+            el.updLaterBtn.disabled = false;
+          });
+      });
+    }
+    if (el.updLaterBtn) {
+      el.updLaterBtn.addEventListener("click", () => {
+        const api = pyApi();
+        if (api && api.snoozeUpdates) api.snoozeUpdates();
+        hideUpdates();
+      });
+    }
   }
 
   // ----------------------------------------------------------- selectors ---
@@ -602,6 +747,10 @@
     } else if (e.key === "Escape") {
       if (state.running) {
         cancelRun();
+      } else if (el.updatesModal && !el.updatesModal.hasAttribute("hidden")) {
+        const api = pyApi();
+        if (api && api.snoozeUpdates) api.snoozeUpdates();
+        hideUpdates();
       } else if (anyFieldError()) {
         clearFormError();
         el.url.focus();
@@ -766,6 +915,21 @@
     });
   }
 
+  wireUpdateUi();
+
+  let autoChecked = false;
+  function autoCheckUpdates() {
+    if (autoChecked) return;
+    autoChecked = true;
+    const api = pyApi();
+    if (!api || !api.checkUpdates) return;
+    api.checkUpdates({ auto: true })
+      .then((res) => {
+        if (res && res.tools) renderUpdates(res.tools);
+      })
+      .catch(() => {});
+  }
+
   // --------------------------------------------------------------- init ---
   // The preload bridge (window.grabtify) is live before any page script
   // runs, but we still poll so the panel copes with slow IPC startup.
@@ -789,6 +953,7 @@
         renderStatus();
         log(t("boot.ready"));
         log(t("boot.toolsNote"), "note");
+        autoCheckUpdates();
       }
       hideBoot();
     }).catch((e) => {

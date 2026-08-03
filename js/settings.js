@@ -22,6 +22,8 @@ const DEFAULTS = {
   convert: false,
   autoEncode: true,
   language: "en",
+  updateCheckAt: 0,
+  updateSnoozeUntil: 0,
 };
 
 // Option labels are i18n keys (see js/i18n.js) resolved by the renderer's

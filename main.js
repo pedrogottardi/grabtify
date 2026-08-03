@@ -16,6 +16,7 @@ const settingsMod = require("./js/settings");
 const toolsMod = require("./js/tools");
 const pipeline = require("./js/pipeline");
 const resolveApiModule = require("./js/resolve_api");
+const updater = require("./js/updater");
 const i18n = require("./js/i18n");
 
 function t(key, vars) {
@@ -46,6 +47,8 @@ resolveApiModule.setActiveApi(resolveApi);
 
 let win = null;
 let activeJob = null; // { running: bool, cancelState: {cancelled, child} }
+
+const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function emit(ev) {
   if (win && !win.isDestroyed()) {
@@ -228,6 +231,52 @@ function registerIpc() {
     const target = String(url || "").trim();
     if (!/^https?:\/\//i.test(target)) return { ok: false };
     await shell.openExternal(target);
+    return { ok: true };
+  });
+
+  // ------------------------------------------------------------ updater ---
+  // Explicit checks always hit the network; automatic ones (panel open) are
+  // throttled to once a day and silenced while the user has snoozed them.
+  ipcMain.handle("grabtify:check-updates", async (_e, opts) => {
+    useLanguage();
+    const explicit = !!(opts && opts.explicit);
+    if (!explicit) {
+      const s0 = settingsMod.load();
+      if ((s0.updateSnoozeUntil || 0) > Date.now()) return { tools: null, skipped: "snoozed" };
+      if (Date.now() - (s0.updateCheckAt || 0) < UPDATE_INTERVAL_MS) {
+        return { tools: null, skipped: "throttled" };
+      }
+    }
+    const tools = await updater.latestVersions();
+    const s = settingsMod.load();
+    s.updateCheckAt = Date.now();
+    settingsMod.save(s);
+    emit({ type: "updates", tools: tools });
+    return { tools: tools };
+  });
+
+  ipcMain.handle("grabtify:update-tools", async (_e, ids) => {
+    useLanguage();
+    if (activeJob && activeJob.running) {
+      return { ok: false, err: t("updates.jobRunning") };
+    }
+    const list = Array.isArray(ids) ? ids : [];
+    const results = await updater.updateTools(list, (tool, state, pct) => {
+      emit({ type: "updateProgress", tool: tool, state: state, pct: pct });
+    });
+    const s = settingsMod.load();
+    s.updateCheckAt = Date.now();
+    settingsMod.save(s);
+    const fresh = await updater.latestVersions();
+    emit({ type: "updates", tools: fresh });
+    emit({ type: "tools", tools: toolsMod.quickCheckAll() });
+    return { ok: true, results: results };
+  });
+
+  ipcMain.handle("grabtify:snooze-updates", () => {
+    const s = settingsMod.load();
+    s.updateSnoozeUntil = Date.now() + UPDATE_INTERVAL_MS;
+    settingsMod.save(s);
     return { ok: true };
   });
 }

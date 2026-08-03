@@ -5,7 +5,7 @@
   "main": "main.js",
   "description": "Grabtify as a DaVinci Resolve Workflow Integration Plugin. Resolve hosts its own Electron runtime; this package has no runtime dependencies of its own.",
   "scripts": {
-    "check": "node --check main.js && node --check preload.js && node --check js/i18n.js && node --check js/validation.js && node --check js/app.js && node --check js/tools.js && node --check js/pipeline.js && node --check js/resolve_api.js && node --check js/settings.js",
+    "check": "node --check main.js && node --check preload.js && node --check js/i18n.js && node --check js/validation.js && node --check js/app.js && node --check js/tools.js && node --check js/pipeline.js && node --check js/resolve_api.js && node --check js/settings.js && node --check js/updater.js",
     "test": "node --test"
   }
 }

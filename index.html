@@ -199,8 +199,12 @@
       </ul>
       <div class="rig-foot">
         <span class="rig-summary" id="rigSummary" role="status" aria-live="polite"></span>
-        <button type="button" class="btn ghost btn-sm" id="recheckResolveBtn"
-                data-i18n="settings.recheck">Check again</button>
+        <div class="rig-btns">
+          <button type="button" class="btn ghost btn-sm" id="checkUpdatesBtn"
+                  data-i18n="settings.checkUpdates">Check for updates</button>
+          <button type="button" class="btn ghost btn-sm" id="recheckResolveBtn"
+                  data-i18n="settings.recheck">Check again</button>
+        </div>
       </div>
     </div>
 
@@ -208,6 +212,23 @@
       licensed to download. Most platforms' terms restrict downloading, and this
       tool does not bypass DRM.</p>
   </section>
+
+  <div class="modal-overlay" id="updatesModal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="updatesTitle">
+      <h2 class="modal-title" id="updatesTitle" data-i18n="updates.title">Binary updates</h2>
+      <p class="modal-sub" id="updatesSub" data-i18n="updates.sub">Newer versions are
+        available for the bundled tools.</p>
+      <ul class="upd-list" id="updatesList"></ul>
+      <p class="modal-note" id="updatesNote" data-i18n="updates.note">Updating replaces the
+        tools in bin\win. You will be asked to confirm once.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn primary" id="updNowBtn"
+                data-i18n="updates.updateNow">Update now</button>
+        <button type="button" class="btn ghost" id="updLaterBtn"
+                data-i18n="updates.later">Later</button>
+      </div>
+    </div>
+  </div>
 
   <section class="console" aria-label="Job log" data-i18n-aria="console.jobLog">
     <div class="console-head">

@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld("grabtify", {
   openFolder: (dir) => ipcRenderer.invoke("grabtify:open-folder", dir),
   browseFolder: () => ipcRenderer.invoke("grabtify:browse-folder"),
   recheckResolve: () => ipcRenderer.invoke("grabtify:recheck-resolve"),
+  checkUpdates: (opts) => ipcRenderer.invoke("grabtify:check-updates", opts),
+  updateTools: (ids) => ipcRenderer.invoke("grabtify:update-tools", ids),
+  snoozeUpdates: () => ipcRenderer.invoke("grabtify:snooze-updates"),
   openExternal: (url) => ipcRenderer.invoke("grabtify:open-external", url),
   onEvent: (callback) => {
     if (typeof callback === "function") eventListeners.push(callback);
