@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Grabtify</title>
+  <link rel="icon" type="image/png" href="newico.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="boot" id="bootScreen" aria-label="Loading" data-i18n-aria="boot.loadingAria">
+    <div class="boot-inner">
+      <span class="boot-mark" aria-hidden="true"></span>
+      <span class="boot-word">GRABTIFY</span>
+      <span class="boot-status" data-i18n="boot.loading">loading…</span>
+    </div>
+  </div>
+
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="wordmark">GRABTIFY</span>
+      </div>
+      <div class="top-right">
+        <a class="icon-btn" id="koFiHeaderBtn" href="https://ko-fi.com/pedrogott"
+           aria-label="Support the project" title="Support the project"
+           data-i18n-aria="settings.support" data-i18n-title="settings.support">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"
+              d="M17 8h1a4 4 0 1 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
+            <path fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" d="M6 2v2M10 2v2M14 2v2"/>
+          </svg>
+        </a>
+        <button type="button" class="icon-btn" id="settingsBtn"
+                aria-label="Settings" aria-expanded="false" title="Settings"
+                data-i18n-aria="settings.title" data-i18n-title="settings.title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor"
+            d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.04-.7-1.62-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.5.42l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.7 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.62-.06.94s.02.63.06.94L2.82 14.2a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.8c.25 0 .46-.18.5-.42l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stage strip + status line -->
+  <div class="status">
+    <ol class="stage-strip" id="stageStrip">
+      <li class="stage-tok" data-stage="fetch">
+        <span class="num">01</span><span class="name" data-i18n="stage.fetch">FETCH</span>
+      </li>
+      <li class="sep" aria-hidden="true">·</li>
+      <li class="stage-tok" data-stage="encode">
+        <span class="num">02</span><span class="name" data-i18n="stage.encode">ENCODE</span>
+      </li>
+      <li class="sep" aria-hidden="true">·</li>
+      <li class="stage-tok" data-stage="timeline">
+        <span class="num">03</span><span class="name">TIMELINE</span>
+      </li>
+    </ol>
+    <p class="status-line" id="statusLine" role="status" aria-live="polite"></p>
+  </div>
+
+  <main class="card" id="mainView">
+    <div class="row">
+      <label class="field grow">
+        <span class="label" data-i18n="form.videoLink">Video link</span>
+        <input type="text" id="url" class="mono" spellcheck="false"
+               placeholder="https://www.youtube.com/watch?v=…" data-i18n-ph="form.urlPh"
+               autocomplete="off">
+      </label>
+      <label class="field mode-field">
+        <span class="label" data-i18n="form.mode">Mode</span>
+        <select id="mode"></select>
+      </label>
+    </div>
+
+    <div class="row">
+      <label class="field grow">
+        <span class="label video-only" data-i18n="form.maxQuality">Quality</span>
+        <span class="label audio-only" data-i18n="form.audioQuality" hidden>Audio quality</span>
+        <select id="quality" class="video-only"></select>
+        <select id="audioQuality" class="audio-only" hidden></select>
+      </label>
+      <label class="field grow">
+        <span class="label" data-i18n="form.insertAt">Insert clip at</span>
+        <select id="insertMode"></select>
+      </label>
+    </div>
+
+    <details class="trim" id="trimBlock">
+      <summary class="trim-summary">
+        <span data-i18n="form.trim">Trim clip</span>
+        <span class="caret" aria-hidden="true">▾</span>
+      </summary>
+      <div class="row tc-row trim-panel">
+        <label class="field">
+          <span class="label"><span data-i18n="form.inPoint">In point</span> <em data-i18n="form.optional">(optional)</em></span>
+          <input type="text" id="timeIn" class="mono tc" placeholder="0:00" data-i18n-ph="form.timePh" spellcheck="false">
+        </label>
+        <label class="field">
+          <span class="label"><span data-i18n="form.outPoint">Out point</span> <em data-i18n="form.optional">(optional)</em></span>
+          <input type="text" id="timeOut" class="mono tc" placeholder="0:00" data-i18n-ph="form.timePh" spellcheck="false">
+        </label>
+        <button type="button" class="btn ghost" id="clearTcBtn"
+                title="Clear the in/out points" data-i18n="form.clear"
+                data-i18n-title="form.clearTitle">clear</button>
+      </div>
+    </details>
+
+    <p class="notice" id="encodeNotice" hidden data-i18n="form.encodeNotice">→ "Encode to MP4" will be turned on for this job</p>
+
+    <div class="actions">
+      <button type="button" class="btn primary" id="goBtn" data-i18n="form.grab">Grabtify to timeline</button>
+      <button type="button" class="btn danger" id="cancelBtn" hidden data-i18n="form.cancel">Cancel</button>
+      <button type="button" class="btn ghost" id="openBtn" data-i18n="form.openFolder">Open folder</button>
+    </div>
+  </main>
+
+  <section class="card settings" id="settingsView" hidden>
+
+    <div class="set-block">
+      <h2 class="section-title" data-i18n="settings.general">General</h2>
+      <div class="row">
+        <label class="field grow">
+          <span class="label" data-i18n="form.language">Language</span>
+          <select id="language"></select>
+        </label>
+      </div>
+    </div>
+
+    <div class="set-block">
+      <h2 class="section-title" data-i18n="settings.video">Video</h2>
+      <div class="row">
+        <label class="field grow">
+          <span class="label" data-i18n="settings.trimTiming">Trim timing</span>
+          <select id="trimMethod"></select>
+        </label>
+        <label class="field grow video-only manual-only">
+          <span class="label" data-i18n="settings.encodeQuality">Encode quality</span>
+          <select id="preset"></select>
+        </label>
+      </div>
+      <div class="checks video-only">
+        <label class="check">
+          <input type="checkbox" id="autoEncode">
+          <span data-i18n="settings.autoEncode">Encode automatically</span>
+        </label>
+        <p class="check-note" data-i18n="settings.autoEncodeNote">Converts unusual formats to H.264 MP4.</p>
+      </div>
+      <div class="checks video-only manual-only">
+        <label class="check">
+          <input type="checkbox" id="convert">
+          <span data-i18n="settings.encodeToMp4">Always encode to MP4</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="set-block">
+      <h2 class="section-title" data-i18n="settings.storage">Storage</h2>
+      <div class="row">
+        <label class="field grow">
+          <span class="label" data-i18n="settings.saveTo">Save downloads to</span>
+          <input type="text" id="outDir" class="mono" spellcheck="false">
+        </label>
+        <button type="button" class="btn ghost" id="browseBtn" data-i18n="settings.browse">Choose…</button>
+      </div>
+    </div>
+
+    <div class="set-block rig" id="rigBlock" title="Tools this panel drives"
+         data-i18n-title="settings.toolsTitle">
+      <h2 class="section-title" data-i18n="settings.system">System check</h2>
+      <ul class="rig-list">
+        <li class="rig-row wait" id="rigResolve">
+          <span class="rig-glyph" aria-hidden="true"></span>
+          <span class="rig-name" id="chipResolve">resolve-api</span>
+          <span class="rig-role" data-i18n="settings.roleResolve">DaVinci Resolve</span>
+          <span class="rig-state" id="stResolve" data-i18n="status.checking">checking…</span>
+        </li>
+        <li class="rig-row wait" id="rigYtdlp" title="checking…" data-i18n-title="status.checking">
+          <span class="rig-glyph" aria-hidden="true"></span>
+          <span class="rig-name" id="chipYtdlp">yt-dlp</span>
+          <span class="rig-role" data-i18n="settings.roleYtdlp">Downloader</span>
+          <span class="rig-state" id="stYtdlp" data-i18n="status.checking">checking…</span>
+        </li>
+        <li class="rig-row wait" id="rigFfmpeg" title="checking…" data-i18n-title="status.checking">
+          <span class="rig-glyph" aria-hidden="true"></span>
+          <span class="rig-name" id="chipFfmpeg">ffmpeg</span>
+          <span class="rig-role" data-i18n="settings.roleFfmpeg">Encoder</span>
+          <span class="rig-state" id="stFfmpeg" data-i18n="status.checking">checking…</span>
+        </li>
+      </ul>
+      <div class="rig-foot">
+        <span class="rig-summary" id="rigSummary" role="status" aria-live="polite"></span>
+        <button type="button" class="btn ghost btn-sm" id="recheckResolveBtn"
+                data-i18n="settings.recheck">Check again</button>
+      </div>
+    </div>
+
+    <p class="legal-note" data-i18n="legal.text">Fetch only videos you own or are
+      licensed to download. Most platforms' terms restrict downloading, and this
+      tool does not bypass DRM.</p>
+  </section>
+
+  <section class="console" aria-label="Job log" data-i18n-aria="console.jobLog">
+    <div class="console-head">
+      <span class="dot r" aria-hidden="true"></span>
+      <span class="dot y" aria-hidden="true"></span>
+      <span class="dot g" aria-hidden="true"></span>
+      <span data-i18n="console.jobLog">Job log</span>
+    </div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <footer class="legal">
+    <span class="ver">Grabtify v1.0</span>
+    <a href="https://ko-fi.com/pedrogott" class="coffee" id="koFiLink"
+       data-i18n="settings.kofi">Buy me a coffee!</a>
+  </footer>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/validation.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

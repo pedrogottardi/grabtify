@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BlackmagicDesign>
+    <Plugin>
+        <Id>com.grabtify.plugin</Id>
+        <Name>Grabtify</Name>
+        <Version>1.0</Version>
+        <Description>Fetch a video with yt-dlp, optionally encode it with ffmpeg, and drop it straight into the active DaVinci Resolve sequence.</Description>
+        <FilePath>./main.js</FilePath>
+    </Plugin>
+</BlackmagicDesign>

@@ -1,0 +1,9 @@
+# Third-party binaries are downloaded by install.bat on first run
+bin/win/*.exe
+bin/mac/
+WorkflowIntegration.node
+
+# Dev / build artifacts
+node_modules/
+*.log
+*.zip
