@@ -368,6 +368,7 @@
     const mapping = [
       { tool: "yt-dlp", state: "stYtdlp" },
       { tool: "ffmpeg", state: "stFfmpeg" },
+      { tool: "deno", state: "stDeno" },
     ];
     for (const m of mapping) {
       const info = tools[m.tool];
@@ -718,12 +719,16 @@
     });
   }
 
-  // Timecode auto-grouping — same behaviour as YOINK!
+  // Timecode auto-grouping — same behaviour as YOINK! Colons are inserted
+  // automatically while typing, grouping right-to-left from the digit count:
+  // 1-2 digits = seconds, 3-4 = M:SS/MM:SS, 5-6 = H:MM:SS/HH:MM:SS (max
+  // HH:MM:SS). Any ":" the user types or pastes is absorbed and rebuilt into
+  // that canonical form, so "1:30:00" and "13000" both end up "1:30:00".
   function formatTimecode(v) {
     if (v.indexOf(".") !== -1) return v;
     if (!/^[0-9:]*$/.test(v)) return v;
     let d = v.replace(/:/g, "");
-    if (d.length > 7) d = d.slice(0, 7);
+    if (d.length > 6) d = d.slice(0, 6);
     if (d.length <= 2) return d;
     if (d.length <= 4) return d.slice(0, d.length - 2) + ":" + d.slice(-2);
     return d.slice(0, d.length - 4) + ":" + d.slice(-4, -2) + ":" + d.slice(-2);

@@ -83,7 +83,7 @@ function checkTool(base) {
 }
 
 function quickCheckAll() {
-  const names = ["yt-dlp", "ffmpeg"];
+  const names = ["yt-dlp", "ffmpeg", "deno"];
   const result = {};
   for (const n of names) result[n] = checkTool(n);
   return result;

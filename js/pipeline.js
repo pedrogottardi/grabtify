@@ -138,11 +138,12 @@ async function download(opts, cancelState, emit) {
     args.push("--ffmpeg-location", path.dirname(ffmpeg.cmd));
   }
 
-  if (opts.trim && opts.trim_method === "download") {
-    const s = opts.time_in === null || opts.time_in === undefined ? "0" : fmtSeconds(opts.time_in);
-    const e = opts.time_out === null || opts.time_out === undefined ? "inf" : fmtSeconds(opts.time_out);
-    args.push("--download-sections", "*" + s + "-" + e, "--force-keyframes-at-cuts");
-    log(emit, t("job.downloadTrim", [s, e]), "note");
+  // YouTube now requires a JS runtime to solve its download challenges;
+  // without one some formats fail with HTTP 403. yt-dlp finds deno on PATH
+  // or next to yt-dlp.exe — when we have a real copy, point to it directly.
+  const deno = tools.resolveTool("deno");
+  if (deno.cmd && fs.existsSync(deno.cmd)) {
+    args.push("--js-runtimes", "deno:" + deno.cmd);
   }
 
   args.push(opts.url);
@@ -215,9 +216,101 @@ async function download(opts, cancelState, emit) {
     throw new Error(t("job.noOutput", [listing]));
   }
 
-  setStage(emit, "fetch", "done", path.basename(filePath));
-  log(emit, t("job.downloaded", [filePath]), "ok");
-  return filePath;
+  let finalFile = filePath;
+  if (opts.trim && opts.trim_method === "download") {
+    finalFile = await cutLocal(filePath, opts, cancelState, emit);
+  }
+
+  setStage(emit, "fetch", "done", path.basename(finalFile));
+  log(emit, t("job.downloaded", [finalFile]), "ok");
+  return finalFile;
+}
+
+// The "download" trim method used to hand --download-sections to yt-dlp, which
+// for DASH sources makes ffmpeg re-open the signed media URL — that 403s on
+// long videos (expired signature). Instead we download the whole file (yt-dlp
+// handles headers/signing correctly) and cut it locally with a fast stream
+// copy, which never touches the remote URL and works for any length.
+async function cutLocal(inputFile, opts, cancelState, emit) {
+  const startS = opts.time_in === null || opts.time_in === undefined ? 0 : opts.time_in;
+  const endS = opts.time_out === null || opts.time_out === undefined ? null : opts.time_out;
+
+  const base = inputFile.replace(/\.[^.\\/]+$/, "");
+  const ext = path.extname(inputFile);
+  let cutFile = base + "-cut" + ext;
+  let suffix = 2;
+  for (;;) {
+    const clash = cutFile.toLowerCase() === inputFile.toLowerCase() || fs.existsSync(cutFile);
+    if (clash) {
+      cutFile = base + "-cut-" + suffix + ext;
+      suffix += 1;
+    } else {
+      break;
+    }
+  }
+
+  const s = fmtSeconds(Math.max(0, startS));
+  const e = endS === null ? t("job.cutToEnd") : fmtSeconds(endS);
+  const args = ["-hide_banner", "-nostats", "-y"];
+  if (startS > 0) args.push("-ss", s);
+  args.push("-i", inputFile);
+  if (endS !== null) args.push("-t", fmtSeconds(Math.max(0.1, endS - startS)));
+  args.push("-c", "copy", "-avoid_negative_ts", "make_zero", cutFile);
+
+  setStage(emit, "cut", "active", t("job.cutting"));
+  setProgress(emit, null, t("job.cutting"));
+  log(emit, t("job.downloadTrim", [s, e]), "note");
+
+  const totalDur = tools.mediaDuration(inputFile);
+  const span = (endS !== null ? endS : totalDur) - startS;
+
+  function onLine(line) {
+    if (/^progress=end/.test(line)) {
+      setProgress(emit, 100, t("job.cuttingPct", ["100"]));
+      return;
+    }
+    let secs = null;
+    const ms = /out_time_ms=(\d+)/.exec(line);
+    if (ms) secs = parseFloat(ms[1]) / 1e6;
+    else {
+      const t2 = /out_time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(line);
+      if (t2) secs = parseFloat(t2[1]) * 3600 + parseFloat(t2[2]) * 60 + parseFloat(t2[3]);
+    }
+    if (secs === null || !isFinite(secs) || !span || span <= 0) return;
+    const pct = Math.min(100, Math.max(0, ((secs - startS) / span) * 100));
+    setProgress(emit, pct, t("job.cuttingPct", [pct.toFixed(1)]));
+    setStage(emit, "cut", "active", Math.floor(pct) + "%");
+    if (/error/i.test(line)) log(emit, line, "err");
+  }
+
+  const ffmpeg = tools.resolveTool("ffmpeg");
+  let code;
+  try {
+    code = await tools.runTool(ffmpeg.cmd, args, onLine, cancelState);
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      throw new Error(t("job.startFfmpeg", [e.message, tools.toolHint("ffmpeg")]));
+    }
+    throw e;
+  }
+
+  if (cancelState.cancelled) throw new tools.JobCancelled();
+
+  if (code !== 0 || !fs.existsSync(cutFile)) {
+    try { if (fs.existsSync(cutFile)) fs.unlinkSync(cutFile); } catch (e) {}
+    throw new Error(t("job.timestamps"));
+  }
+
+  setStage(emit, "cut", "done", path.basename(cutFile));
+  log(emit, t("job.cutDone", [cutFile]), "ok");
+
+  try {
+    fs.unlinkSync(inputFile);
+    log(emit, t("job.removedRaw"), "note");
+  } catch (e) {
+    log(emit, t("job.couldNotRemove", [e.message]), "note");
+  }
+  return cutFile;
 }
 
 // ------------------------------------------------------------- stage 02 ----

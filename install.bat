@@ -12,7 +12,7 @@ rem    2. Mirrors the plugin files into Resolve's Workflow
 rem       Integration Plugins folder
 rem    3. Locates WorkflowIntegration.node in your Resolve
 rem       installation and copies it next to main.js
-rem    4. Downloads yt-dlp / ffmpeg / ffprobe into bin\win\ if
+rem    4. Downloads yt-dlp / ffmpeg / ffprobe / deno into bin\win\ if
 rem       they are missing (first run only)
 rem ============================================================
 
@@ -143,7 +143,7 @@ if exist "%DEST%\WorkflowIntegration.node" (
 
 rem ---- tools: download what is missing (first run only) ----
 set "MISSING="
-for %%T in (yt-dlp.exe ffmpeg.exe ffprobe.exe) do if not exist "%DEST%\bin\win\%%T" set "MISSING=1"
+for %%T in (yt-dlp.exe ffmpeg.exe ffprobe.exe deno.exe) do if not exist "%DEST%\bin\win\%%T" set "MISSING=1"
 if defined MISSING (
     echo  Downloading command-line tools - first run only...
     call :ensure_tools "%DEST%"
@@ -181,12 +181,14 @@ echo.
 exit /b 0
 
 :ensure_tools
-rem  %1 = installed plugin dir. Downloads yt-dlp, ffmpeg and ffprobe
-rem  into bin\win. A failed download is not fatal: the plugin will
+rem  %1 = installed plugin dir. Downloads yt-dlp, ffmpeg, ffprobe and
+rem  deno into bin\win. A failed download is not fatal: the plugin will
 rem  fall back to tools found on PATH.
 set "TOOL_DIR=%~1\bin\win"
 set "TMPZ=%TEMP%\grabtify-ffmpeg.zip"
 set "TMPD=%TEMP%\grabtify-ffmpeg"
+set "TMPZ2=%TEMP%\grabtify-deno.zip"
+set "TMPD2=%TEMP%\grabtify-deno"
 
 if not exist "%TOOL_DIR%\yt-dlp.exe" (
     echo    yt-dlp.exe...
@@ -194,31 +196,82 @@ if not exist "%TOOL_DIR%\yt-dlp.exe" (
     if errorlevel 1 echo    yt-dlp download failed - the plugin will use PATH instead.
 )
 
+if not exist "%TOOL_DIR%\deno.exe" (
+    echo    deno.exe - YouTube now requires a JS runtime for downloads...
+    call :download "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip" "%TMPZ2%"
+    if errorlevel 1 (
+        echo    deno download failed - some YouTube formats may be unavailable.
+    ) else (
+        if exist "%TMPD2%" rmdir /s /q "%TMPD2%"
+        if not exist "%TMPD2%" mkdir "%TMPD2%"
+        call :extract_zip "%TMPZ2%" "%TMPD2%"
+        if exist "%TMPD2%\deno.exe" (
+            copy /Y "%TMPD2%\deno.exe" "%TOOL_DIR%\deno.exe" >nul
+        ) else (
+            for /r "%TMPD2%" %%f in (deno.exe) do if exist "%%f" copy /Y "%%f" "%TOOL_DIR%\deno.exe" >nul
+        )
+        del "%TMPZ2%" >nul 2>&1
+        if exist "%TMPD2%" rmdir /s /q "%TMPD2%"
+        if not exist "%TOOL_DIR%\deno.exe" echo    extracted, but deno.exe was not found - some YouTube formats may be unavailable.
+    )
+)
+
 if not exist "%TOOL_DIR%\ffmpeg.exe" if not exist "%TOOL_DIR%\ffprobe.exe" (
-    echo    ffmpeg.exe + ffprobe.exe - gyan.dev essentials build...
+    echo    ffmpeg.exe + ffprobe.exe - downloading the essentials build, about 100MB...
     call :download "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" "%TMPZ%"
+    if errorlevel 1 call :download "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip" "%TMPZ%"
     if errorlevel 1 (
         echo    ffmpeg download failed - the plugin will use PATH instead.
     ) else (
         if exist "%TMPD%" rmdir /s /q "%TMPD%"
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%TMPZ%' -DestinationPath '%TMPD%' -Force"
-        for /r "%TMPD%" %%f in (ffmpeg.exe) do copy /Y "%%f" "%TOOL_DIR%\ffmpeg.exe" >nul 2>&1
-        for /r "%TMPD%" %%f in (ffprobe.exe) do copy /Y "%%f" "%TOOL_DIR%\ffprobe.exe" >nul 2>&1
+        if not exist "%TMPD%" mkdir "%TMPD%"
+        call :extract_zip "%TMPZ%" "%TMPD%"
+        for /r "%TMPD%" %%f in (ffmpeg.exe) do if exist "%%f" copy /Y "%%f" "%TOOL_DIR%\ffmpeg.exe" >nul
+        for /r "%TMPD%" %%f in (ffprobe.exe) do if exist "%%f" copy /Y "%%f" "%TOOL_DIR%\ffprobe.exe" >nul
         del "%TMPZ%" >nul 2>&1
         if exist "%TMPD%" rmdir /s /q "%TMPD%"
+        if not exist "%TOOL_DIR%\ffmpeg.exe" if not exist "%TOOL_DIR%\ffprobe.exe" (
+            echo    extracted, but ffmpeg/ffprobe were not found - the plugin will use PATH instead.
+        )
     )
 )
 exit /b 0
 
-:download
-rem  %1 = url, %2 = output file. Prefers curl.exe; falls back to
-rem  PowerShell Invoke-WebRequest.
-set "DL_URL=%~1"
-set "DL_OUT=%~2"
-where curl.exe >nul 2>&1
+:extract_zip
+rem  %1 = zip, %2 = destination dir. Uses tar.exe (built into
+rem  Windows 10/11) when available - much faster than Expand-Archive.
+set "EZ_ZIP=%~1"
+set "EZ_DEST=%~2"
+where tar.exe >nul 2>&1
 if %errorlevel%==0 (
-    curl.exe -L --fail --silent --show-error -o "%DL_OUT%" "%DL_URL%"
+    tar.exe -xf "%EZ_ZIP%" -C "%EZ_DEST%"
     exit /b %errorlevel%
 )
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%DL_URL%' -OutFile '%DL_OUT%' -UseBasicParsing"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%EZ_ZIP%' -DestinationPath '%EZ_DEST%' -Force"
 exit /b %errorlevel%
+
+:download
+rem  %1 = url, %2 = output file. Prefers curl.exe; falls back to
+rem  PowerShell Invoke-WebRequest. Retries up to 3 times and never
+rem  hangs forever: curl gets connect/max timeouts, and the result is
+rem  only accepted if the file really landed.
+set "DL_URL=%~1"
+set "DL_OUT=%~2"
+set /a DL_TRY=0
+:download_again
+set /a DL_TRY+=1
+where curl.exe >nul 2>&1
+if %errorlevel%==0 (
+    curl.exe -L --fail --progress-bar --connect-timeout 15 --max-time 300 -o "%DL_OUT%" "%DL_URL%"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%DL_URL%' -OutFile '%DL_OUT%' -UseBasicParsing"
+)
+if not errorlevel 1 if exist "%DL_OUT%" exit /b 0
+if %DL_TRY% geq 3 goto download_gave_up
+echo    ... connection stalled - retrying, attempt %DL_TRY% of 3...
+if exist "%DL_OUT%" del "%DL_OUT%" >nul 2>&1
+ping -n 4 127.0.0.1 >nul
+goto download_again
+:download_gave_up
+if exist "%DL_OUT%" del "%DL_OUT%" >nul 2>&1
+exit /b 1
