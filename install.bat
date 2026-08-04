@@ -16,16 +16,18 @@ rem    4. Downloads yt-dlp / ffmpeg / ffprobe / deno into bin\win\ if
 rem       they are missing (first run only)
 rem ============================================================
 
+rem ---- console cosmetics: colors + box drawing (keeps this file ASCII) ----
+call :boxinit
+
 echo.
-echo  Grabtify installer
-echo  ------------------
+call :banner "Grabtify Installer" "DaVinci Resolve Workflow Integration - one-click install"
 echo.
 
 rem ---- request administrator privileges ----
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  This installer writes to ProgramData, so it needs
-    echo  administrator privileges. Accept the UAC prompt.
+    echo  %ESC%[%YEL%m!WARN!%ESC%[0m This installer writes to ProgramData, so it needs
+    echo  %ESC%[%YEL%m!WARN!%ESC%[0m administrator privileges. Accept the UAC prompt.
     echo.
     powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
     exit /b
@@ -41,24 +43,26 @@ set "PLUGIN_ID=com.grabtify.plugin"
 set "INSTALL_ROOT=%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins"
 set "DEST=%INSTALL_ROOT%\%PLUGIN_ID%"
 
-echo  Source : %SRC%
-echo  Target : %DEST%
+echo.
+echo %ESC%[%CYN%m[1/4]%ESC%[0m %ESC%[%WHT%mPre-flight checks%ESC%[0m
+echo %ESC%[%CYN%m  Source :%ESC%[0m %ESC%[%WHT%m%SRC%%ESC%[0m
+echo %ESC%[%CYN%m  Target :%ESC%[0m %ESC%[%WHT%m%DEST%%ESC%[0m
 echo.
 
 if not exist "%INSTALL_ROOT%" (
-    echo  ERROR: Resolve's Workflow Integration folder was not found at:
-    echo    %INSTALL_ROOT%
-    echo  This is normal if DaVinci Resolve Studio is not installed yet.
-    echo  Install DaVinci Resolve Studio ^>= 19.0.2 first, then run
-    echo  install.bat again.
+    echo %ESC%[%RED%m[x]%ESC%[0m ERROR: Resolve's Workflow Integration folder was not found at:
+    echo    %ESC%[%WHT%m%INSTALL_ROOT%%ESC%[0m
+    echo %ESC%[%DIM%m  This is normal if DaVinci Resolve Studio is not installed yet.%ESC%[0m
+    echo %ESC%[%DIM%m  Install DaVinci Resolve Studio ^>= 19.0.2 first, then run%ESC%[0m
+    echo %ESC%[%DIM%m  install.bat again.%ESC%[0m
     echo.
     pause
     exit /b 1
 )
 
 if not exist "%SRC%\manifest.xml" (
-    echo  ERROR: manifest.xml not found next to install.bat. Are you
-    echo  running this from the extracted Grabtify folder?
+    echo %ESC%[%RED%m[x]%ESC%[0m ERROR: manifest.xml not found next to install.bat. Are you
+    echo %ESC%[%DIM%m  running this from the extracted Grabtify folder?%ESC%[0m
     echo.
     pause
     exit /b 1
@@ -71,47 +75,50 @@ tasklist /fi "imagename eq Resolve.exe" 2>nul | find /i "Resolve.exe" >nul
 if not errorlevel 1 set "RESOLVE_RUNNING=1"
 if defined RESOLVE_RUNNING (
     echo.
-    echo  WARNING: DaVinci Resolve is running.
-    echo  The plugin is only loaded when Resolve starts, and open files
-    echo  can block the copy. It is strongly recommended to close Resolve
-    echo  before installing.
+    echo %ESC%[%YEL%m!WARN!%ESC%[0m WARNING: DaVinci Resolve is running.
+    echo %ESC%[%DIM%m  The plugin is only loaded when Resolve starts, and open files%ESC%[0m
+    echo %ESC%[%DIM%m  can block the copy. It is strongly recommended to close Resolve%ESC%[0m
+    echo %ESC%[%DIM%m  before installing.%ESC%[0m
     echo.
-    set /p CONTINUE=Press Enter to wait for Resolve to close, or type s to continue anyway: 
+    set /p CONTINUE=%ESC%[%YEL%m!WARN!%ESC%[0m Press Enter to wait for Resolve to close, or type s to continue anyway: 
     if /i "!CONTINUE!"=="s" (
-        echo  Continuing anyway...
+        echo %ESC%[%YEL%m  Continuing anyway...%ESC%[0m
     ) else (
-        echo  Waiting for Resolve to close...
+        echo %ESC%[%DIM%m  Waiting for Resolve to close...%ESC%[0m
         call :wait_resolve_closed
-        echo  Resolve closed. Continuing.
+        echo %ESC%[%GRN%m  Resolve closed. Continuing.%ESC%[0m
     )
     echo.
 )
 
 rem ---- copy the plugin (binaries and .node are managed separately, so
 rem the mirror never deletes a previously downloaded tool) ----
-echo  Copying plugin files...
+echo %ESC%[%CYN%m[2/4]%ESC%[0m %ESC%[%WHT%mCopying plugin files...%ESC%[0m
 robocopy "%SRC%" "%DEST%" /MIR /XF install.bat uninstall.bat README.md LICENSE .gitignore *.zip *.exe WorkflowIntegration.node /XD .git test /NFL /NDL /NJH /NJS /NP /FP /R:3 /W:2 > "%TEMP%\grabtify-robocopy.log" 2>&1
 set "RC=%errorlevel%"
 if %RC% geq 16 (
-    echo  ERROR: could not copy the plugin. Close DaVinci Resolve and your
-    echo  antivirus, then run install.bat again.
-    echo  Details: %TEMP%\grabtify-robocopy.log
+    echo %ESC%[%RED%m[x]%ESC%[0m ERROR: could not copy the plugin. Close DaVinci Resolve and your
+    echo %ESC%[%DIM%m     antivirus, then run install.bat again.%ESC%[0m
+    echo %ESC%[%DIM%m     Details: %TEMP%\grabtify-robocopy.log%ESC%[0m
     pause
     exit /b 1
 )
 if %RC% geq 8 (
-    echo  ERROR: some plugin files could not be copied. Close DaVinci Resolve
-    echo  and your antivirus, then run install.bat again.
-    echo  Details: %TEMP%\grabtify-robocopy.log
+    echo %ESC%[%RED%m[x]%ESC%[0m ERROR: some plugin files could not be copied. Close DaVinci Resolve
+    echo %ESC%[%DIM%m     and your antivirus, then run install.bat again.%ESC%[0m
+    echo %ESC%[%DIM%m     Details: %TEMP%\grabtify-robocopy.log%ESC%[0m
     pause
     exit /b 1
 )
+echo %ESC%[%GRN%m[OK]%ESC%[0m Plugin files copied.
 
 rem ---- WorkflowIntegration.node - BMD's native module. It ships inside
 rem Resolve / with the "Workflow Integration Plugins" developer docs and
 rem must sit next to main.js. Search this Resolve installation for it. ----
+echo.
+echo %ESC%[%CYN%m[3/4]%ESC%[0m %ESC%[%WHT%mWorkflowIntegration.node and command-line tools%ESC%[0m
 if exist "%DEST%\WorkflowIntegration.node" (
-    echo  WorkflowIntegration.node: already present.
+    echo %ESC%[%GRN%m[OK]%ESC%[0m WorkflowIntegration.node: already present.
 ) else (
     set "NODE_FOUND="
     rem Prefer the module shipped with the Resolve SDK. It lives in the
@@ -127,13 +134,13 @@ if exist "%DEST%\WorkflowIntegration.node" (
         if exist "!NODE_FOUND!" (
             copy /Y "!NODE_FOUND!" "%DEST%\WorkflowIntegration.node" >nul
             if errorlevel 1 (
-                echo  WARNING: could not copy WorkflowIntegration.node.
-                echo  Source: !NODE_FOUND!
-                echo  Copy it manually into:
-                echo    %DEST%
+                echo %ESC%[%YEL%m!WARN!%ESC%[0m WARNING: could not copy WorkflowIntegration.node.
+                echo %ESC%[%DIM%m    Source: !NODE_FOUND!%ESC%[0m
+                echo %ESC%[%DIM%m    Copy it manually into:%ESC%[0m
+                echo %ESC%[%WHT%m    %DEST%%ESC%[0m
                 echo.
             ) else (
-                echo  WorkflowIntegration.node: copied from !NODE_FOUND!
+                echo %ESC%[%GRN%m[OK]%ESC%[0m WorkflowIntegration.node: copied from !NODE_FOUND!
             )
         ) else (
             call :warn_no_node
@@ -145,15 +152,18 @@ rem ---- tools: download what is missing (first run only) ----
 set "MISSING="
 for %%T in (yt-dlp.exe ffmpeg.exe ffprobe.exe deno.exe) do if not exist "%DEST%\bin\win\%%T" set "MISSING=1"
 if defined MISSING (
-    echo  Downloading command-line tools - first run only...
+    echo.
+    echo %ESC%[%WHT%m  Downloading command-line tools - first run only...%ESC%[0m
     call :ensure_tools "%DEST%"
     echo.
 )
 
-echo  Done.
-echo  -----
-echo  Now open DaVinci Resolve Studio and go to:
-echo     Workspace - Workflow Integrations - Grabtify
+echo.
+echo %ESC%[%CYN%m%BX8%%ESC%[0m
+echo %ESC%[%GRN%m  [OK] Done.%ESC%[0m
+echo %ESC%[%WHT%m  Now open DaVinci Resolve Studio and go to:%ESC%[0m
+echo %ESC%[%WHT%m  Workspace - Workflow Integrations - Grabtify%ESC%[0m
+echo %ESC%[%CYN%m%BX8%%ESC%[0m
 echo.
 pause
 exit /b 0
@@ -161,6 +171,34 @@ exit /b 0
 rem ============================================================
 rem  Subroutines
 rem ============================================================
+
+:boxinit
+rem  Generates the ESC character and the box-drawing glyphs at runtime,
+rem  so this file stays pure ASCII (no UTF-8 bytes, no chcp). The glyphs
+rem  (lines 0x2500..0x2518) exist in the OEM codepages cp437/cp850.
+for /f %%A in ('echo prompt $E ^| cmd') do set "ESC=%%A"
+set "WARN=[^!]" & set "WHT=1;37" & set "BLU=34" & set "CYN=36" & set "GRN=32" & set "YEL=33" & set "RED=31" & set "DIM=90"
+set "BOXN=0"
+for /f "delims=" %%C in ('powershell -NoProfile -Command "0x2500,0x2550,0x2502,0x250C,0x2510,0x2514,0x2518 | ForEach-Object { [char]$_ }; [string][char]0x2550*60; [string][char]0x2500*60"') do (
+    set /a BOXN+=1
+    for %%i in (!BOXN!) do set "BX%%i=%%C"
+)
+if not defined BX1 (
+    set "BX1=-" & set "BX2==" & set "BX3=|" & set "BX4=+" & set "BX5=+" & set "BX6=+" & set "BX7=+"
+    set "BX8=" & set "BX9="
+    for /l %%i in (1,1,60) do set "BX8=!BX8!=!" & set "BX9=!BX9!-"
+)
+exit /b 0
+
+:banner
+rem  %1 = title, %2 = tagline. Prints a double-rule header.
+set "BAN_TITLE=%~1"
+set "BAN_TAG=%~2"
+echo %ESC%[%CYN%m%BX8%%ESC%[0m
+echo %ESC%[%WHT%m  %BAN_TITLE%%ESC%[0m
+echo %ESC%[%DIM%m  %BAN_TAG%%ESC%[0m
+echo %ESC%[%CYN%m%BX8%%ESC%[0m
+exit /b 0
 
 :wait_resolve_closed
 tasklist /fi "imagename eq Resolve.exe" 2>nul | find /i "Resolve.exe" >nul
@@ -171,12 +209,12 @@ if not errorlevel 1 (
 exit /b 0
 
 :warn_no_node
-echo  WARNING: WorkflowIntegration.node was not found. The panel will
-echo  open but report "Resolve not ready" until it is added.
-echo  Get it: in Resolve, Help - Documentation - Developer, download
-echo  the "Workflow Integration Plugins" package, and copy
-echo  WorkflowIntegration.node into:
-echo    %DEST%
+echo %ESC%[%YEL%m!WARN!%ESC%[0m WARNING: WorkflowIntegration.node was not found. The panel will
+echo %ESC%[%YEL%m!WARN!%ESC%[0m open but report "Resolve not ready" until it is added.
+echo %ESC%[%DIM%m  Get it: in Resolve, Help - Documentation - Developer, download%ESC%[0m
+echo %ESC%[%DIM%m  the "Workflow Integration Plugins" package, and copy%ESC%[0m
+echo %ESC%[%DIM%m  WorkflowIntegration.node into:%ESC%[0m
+echo %ESC%[%WHT%m    %DEST%%ESC%[0m
 echo.
 exit /b 0
 
@@ -218,8 +256,14 @@ if not exist "%TOOL_DIR%\deno.exe" (
 
 if not exist "%TOOL_DIR%\ffmpeg.exe" if not exist "%TOOL_DIR%\ffprobe.exe" (
     echo    ffmpeg.exe + ffprobe.exe - downloading the essentials build, about 100MB...
-    call :download "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" "%TMPZ%"
-    if errorlevel 1 call :download "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip" "%TMPZ%"
+    rem gyan.dev itself is slow (~150 KB/s), so fetch the current version and
+    rem pull the same essentials build from gyan's GitHub mirror (CDN, ~11 MB/s).
+    set "FF_VER="
+    for /f "delims=" %%v in ('powershell -NoProfile -Command "(New-Object Net.WebClient).DownloadString('https://www.gyan.dev/ffmpeg/builds/release-version').Trim()" 2^>nul') do set "FF_VER=%%v"
+    if defined FF_VER call :download "https://github.com/GyanD/codexffmpeg/releases/download/!FF_VER!/ffmpeg-!FF_VER!-essentials_build.zip" "%TMPZ%"
+    if defined FF_VER if errorlevel 1 call :download "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip" "%TMPZ%"
+    if not defined FF_VER call :download "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip" "%TMPZ%"
+    if errorlevel 1 call :download "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" "%TMPZ%"
     if errorlevel 1 (
         echo    ffmpeg download failed - the plugin will use PATH instead.
     ) else (
@@ -262,15 +306,14 @@ set /a DL_TRY=0
 set /a DL_TRY+=1
 where curl.exe >nul 2>&1
 if %errorlevel%==0 (
-    curl.exe -L --fail --progress-bar --connect-timeout 15 --max-time 300 -o "%DL_OUT%" "%DL_URL%"
+    curl.exe -L --fail -C - --progress-bar --connect-timeout 15 --max-time 300 -o "%DL_OUT%" "%DL_URL%"
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%DL_URL%' -OutFile '%DL_OUT%' -UseBasicParsing"
 )
 if not errorlevel 1 if exist "%DL_OUT%" exit /b 0
 if %DL_TRY% geq 3 goto download_gave_up
-echo    ... connection stalled - retrying, attempt %DL_TRY% of 3...
-if exist "%DL_OUT%" del "%DL_OUT%" >nul 2>&1
-ping -n 4 127.0.0.1 >nul
+    echo    ... connection stalled - retrying, attempt %DL_TRY% of 3...
+    ping -n 4 127.0.0.1 >nul
 goto download_again
 :download_gave_up
 if exist "%DL_OUT%" del "%DL_OUT%" >nul 2>&1
