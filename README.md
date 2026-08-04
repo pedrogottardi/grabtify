@@ -34,9 +34,7 @@ separate window to babysit, and no configuration beyond a single `install.bat`.
 2. **Run `install.bat`** and accept the UAC prompt.
 3. **In Resolve Studio**, open **Workspace → Workflow Integrations → Grabtify**.
 
-<p align="center">
 ![Screenshot of the Grabtify panel](screenshot.png)
-</p>
 
 ## How it works
 
