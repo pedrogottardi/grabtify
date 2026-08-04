@@ -90,7 +90,7 @@ if defined RESOLVE_RUNNING (
 rem ---- copy the plugin (binaries and .node are managed separately, so
 rem the mirror never deletes a previously downloaded tool) ----
 echo  Copying plugin files...
-robocopy "%SRC%" "%DEST%" /MIR /XF install.bat uninstall.bat README.md LICENSE .gitignore *.zip *.exe WorkflowIntegration.node /XD .git /NFL /NDL /NJH /NJS /NP /FP /R:3 /W:2 > "%TEMP%\grabtify-robocopy.log" 2>&1
+robocopy "%SRC%" "%DEST%" /MIR /XF install.bat uninstall.bat README.md LICENSE .gitignore *.zip *.exe WorkflowIntegration.node /XD .git test /NFL /NDL /NJH /NJS /NP /FP /R:3 /W:2 > "%TEMP%\grabtify-robocopy.log" 2>&1
 set "RC=%errorlevel%"
 if %RC% geq 16 (
     echo  ERROR: could not copy the plugin. Close DaVinci Resolve and your

@@ -181,7 +181,7 @@
       "resolve.connected": "Resolve Studio is connected.",
       "resolve.notResponding": "Resolve is not responding.",
       "resolve.missingModule": "WorkflowIntegration.node is missing. Reinstall " +
-        "Grabtify or run deploy.bat after adding the module (see README).",
+        "Grabtify or run install.bat after adding the module (see README).",
       "resolve.bindFailRunning": "Could not bind to DaVinci Resolve. Open the " +
         "plugin while Resolve Studio is running.",
       "resolve.bindFailRunning2": "Could not bind to DaVinci Resolve. Is Resolve " +
@@ -387,7 +387,7 @@
       "resolve.connected": "Resolve Studio conectado.",
       "resolve.notResponding": "O Resolve não está respondendo.",
       "resolve.missingModule": "WorkflowIntegration.node está ausente. Reinstale " +
-        "o Grabtify ou execute deploy.bat depois de adicionar o módulo (veja o README).",
+        "o Grabtify ou execute install.bat depois de adicionar o módulo (veja o README).",
       "resolve.bindFailRunning": "Não foi possível conectar ao DaVinci Resolve. " +
         "Abra o plugin com o Resolve Studio em execução.",
       "resolve.bindFailRunning2": "Não foi possível conectar ao DaVinci Resolve. " +
