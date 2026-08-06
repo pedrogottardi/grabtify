@@ -4,247 +4,341 @@
   <meta charset="utf-8">
   <title>Grabtify</title>
   <link rel="icon" type="image/png" href="newico.png">
+  <link rel="stylesheet" href="css/98.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
+  <!-- Boot splash: a small 98 window floating over the desktop -->
   <div class="boot" id="bootScreen" aria-label="Loading" data-i18n-aria="boot.loadingAria">
-    <div class="boot-inner">
-      <span class="boot-mark" aria-hidden="true"></span>
-      <span class="boot-word">GRABTIFY</span>
-      <span class="boot-status" data-i18n="boot.loading">loading…</span>
+    <div class="window boot-win">
+      <div class="title-bar">
+        <div class="title-bar-text">GRABTIFY</div>
+      </div>
+      <div class="window-body">
+        <p class="boot-status" data-i18n="boot.loading">loading…</p>
+      </div>
     </div>
   </div>
 
-  <header class="top">
-    <div class="top-row">
-      <div class="brand">
-        <span class="mark" aria-hidden="true"></span>
-        <span class="wordmark">GRABTIFY</span>
-      </div>
-      <div class="top-right">
-        <a class="icon-btn" id="koFiHeaderBtn" href="https://ko-fi.com/pedrogott"
-           aria-label="Support the project" title="Support the project"
-           data-i18n-aria="settings.support" data-i18n-title="settings.support">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round"
-              d="M17 8h1a4 4 0 1 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
-            <path fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" d="M6 2v2M10 2v2M14 2v2"/>
-          </svg>
-        </a>
-        <button type="button" class="icon-btn" id="settingsBtn"
-                aria-label="Settings" aria-expanded="false" title="Settings"
-                data-i18n-aria="settings.title" data-i18n-title="settings.title">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor"
-            d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.04-.7-1.62-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.5.42l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.7 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.62-.06.94s.02.63.06.94L2.82 14.2a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.8c.25 0 .46-.18.5-.42l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96c.22.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
-        </button>
+  <!-- The whole panel is one Windows 98 program window -->
+  <div class="window app-main">
+
+    <div class="title-bar" id="titleBar">
+      <div class="title-bar-text">GRABTIFY</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize" id="minimizeBtn"></button>
+        <button aria-label="Close" id="closeBtn"></button>
       </div>
     </div>
-  </header>
 
-  <!-- Stage strip + status line -->
-  <div class="status">
-    <ol class="stage-strip" id="stageStrip">
-      <li class="stage-tok" data-stage="fetch">
-        <span class="num">01</span><span class="name" data-i18n="stage.fetch">FETCH</span>
-      </li>
-      <li class="sep" aria-hidden="true">·</li>
-      <li class="stage-tok" data-stage="encode">
-        <span class="num">02</span><span class="name" data-i18n="stage.encode">ENCODE</span>
-      </li>
-      <li class="sep" aria-hidden="true">·</li>
-      <li class="stage-tok" data-stage="timeline">
-        <span class="num">03</span><span class="name">TIMELINE</span>
-      </li>
-    </ol>
-    <p class="status-line" id="statusLine" role="status" aria-live="polite"></p>
+    <div class="window-body">
+
+      <!-- Stage strip: 01 FETCH · 02 ENCODE · 03 TIMELINE -->
+      <ol class="stage-strip" id="stageStrip">
+        <li class="stage-tok idle" data-stage="fetch">
+          <span class="num">01</span><span class="name" data-i18n="stage.fetch">FETCH</span>
+        </li>
+        <li class="sep" aria-hidden="true">·</li>
+        <li class="stage-tok idle" data-stage="encode">
+          <span class="num">02</span><span class="name" data-i18n="stage.encode">ENCODE</span>
+        </li>
+        <li class="sep" aria-hidden="true">·</li>
+        <li class="stage-tok idle" data-stage="timeline">
+          <span class="num">03</span><span class="name">TIMELINE</span>
+        </li>
+      </ol>
+
+      <!-- Grab / Settings / About tabs -->
+      <menu role="tablist" id="tabStrip">
+        <li role="tab" aria-selected="true" data-tab="main"><a href="#" data-i18n="tab.main">Grab</a></li>
+        <li role="tab" aria-selected="false" data-tab="settings"><a href="#" data-i18n="tab.settings">Settings</a></li>
+        <li role="tab" aria-selected="false" data-tab="about"><a href="#" data-i18n="tab.about">About</a></li>
+      </menu>
+
+      <!-- Tab panel: Grab -->
+      <div class="window tabpanel" id="mainView" role="tabpanel">
+        <div class="window-body">
+
+          <div class="row">
+            <div class="field grow">
+              <label class="flabel" for="url" data-i18n="form.videoLink">Video link</label>
+              <input type="text" id="url" spellcheck="false" autocomplete="off"
+                     placeholder="https://www.youtube.com/watch?v=…" data-i18n-ph="form.urlPh">
+            </div>
+            <div class="field mode-field">
+              <label class="flabel" for="mode" data-i18n="form.mode">Mode</label>
+              <select id="mode"></select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field grow">
+              <label class="flabel video-only" for="quality" data-i18n="form.maxQuality">Quality</label>
+              <label class="flabel audio-only" for="audioQuality" data-i18n="form.audioQuality" hidden>Audio quality</label>
+              <select id="quality" class="video-only"></select>
+              <select id="audioQuality" class="audio-only" hidden></select>
+            </div>
+            <div class="field grow">
+              <label class="flabel" for="insertMode" data-i18n="form.insertAt">Insert clip at</label>
+              <select id="insertMode"></select>
+            </div>
+          </div>
+
+          <details class="trim" id="trimBlock">
+            <summary class="trim-summary">
+              <span data-i18n="form.trim">Trim clip</span>
+            </summary>
+            <div class="row tc-row trim-panel">
+              <div class="field">
+                <label class="flabel" for="timeIn">
+                  <span data-i18n="form.inPoint">In point</span>
+                  <em data-i18n="form.optional">(optional)</em>
+                </label>
+                <input type="text" id="timeIn" class="tc" placeholder="0:00" data-i18n-ph="form.timePh" spellcheck="false">
+              </div>
+              <div class="field">
+                <label class="flabel" for="timeOut">
+                  <span data-i18n="form.outPoint">Out point</span>
+                  <em data-i18n="form.optional">(optional)</em>
+                </label>
+                <input type="text" id="timeOut" class="tc" placeholder="0:00" data-i18n-ph="form.timePh" spellcheck="false">
+              </div>
+              <button type="button" class="btn btn-sm" id="clearTcBtn"
+                      title="Clear the in/out points" data-i18n="form.clear"
+                      data-i18n-title="form.clearTitle">clear</button>
+            </div>
+          </details>
+
+          <details class="trim experimental" id="experimentalBlock">
+            <summary class="trim-summary">
+              <span data-i18n="form.experimental">Experimental</span>
+            </summary>
+            <div class="row trim-panel">
+              <div class="field grow">
+                <label class="flabel" for="effect" data-i18n="form.effect">Video effect</label>
+                <select id="effect"></select>
+              </div>
+              <div class="field grow">
+                <label class="flabel" for="audioEffect" data-i18n="form.audioEffect">Audio effect</label>
+                <select id="audioEffect"></select>
+              </div>
+            </div>
+            <p class="notice exp-note" data-i18n="form.experimentalNote">
+              Effects force a re-encode and override the normal quality and encoding settings.
+            </p>
+          </details>
+
+          <p class="notice" id="encodeNotice" hidden data-i18n="form.encodeNotice">→ "Encode to MP4" will be turned on for this job</p>
+
+          <div class="actions">
+            <button type="button" class="btn default" id="goBtn" data-i18n="form.grab">Grabtify to timeline</button>
+            <button type="button" class="btn" id="cancelBtn" hidden data-i18n="form.cancel">Cancel</button>
+            <button type="button" class="btn" id="openBtn" data-i18n="form.openFolder">Open folder</button>
+          </div>
+
+          <!-- Job log, fixed at the bottom of the Grab tab only -->
+          <div class="console-panel">
+            <div class="console-head">
+              <span class="console-title" data-i18n="console.jobLog">Job log</span>
+            </div>
+            <div class="sunken-panel log-panel">
+              <div class="log" id="log" role="log" aria-live="polite"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Tab panel: Settings -->
+      <div class="window tabpanel" id="settingsView" role="tabpanel" hidden>
+        <div class="window-body">
+
+          <fieldset>
+            <legend data-i18n="settings.general">General</legend>
+            <div class="row">
+              <div class="field grow">
+                <label class="flabel" for="language" data-i18n="form.language">Language</label>
+                <select id="language"></select>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend data-i18n="settings.video">Video</legend>
+            <div class="row">
+              <div class="field grow">
+                <label class="flabel" for="trimMethod" data-i18n="settings.trimTiming">Trim timing</label>
+                <select id="trimMethod"></select>
+              </div>
+              <div class="field grow video-only manual-only">
+                <label class="flabel" for="preset" data-i18n="settings.encodeQuality">Encode quality</label>
+                <select id="preset"></select>
+              </div>
+            </div>
+            <div class="checks video-only">
+              <div class="field-row">
+                <input type="checkbox" id="autoEncode">
+                <label for="autoEncode" data-i18n="settings.autoEncode">Encode automatically</label>
+              </div>
+              <p class="check-note" data-i18n="settings.autoEncodeNote">Converts unusual formats to H.264 MP4.</p>
+            </div>
+            <div class="checks video-only manual-only">
+              <div class="field-row">
+                <input type="checkbox" id="convert">
+                <label for="convert" data-i18n="settings.encodeToMp4">Always encode to MP4</label>
+              </div>
+            </div>
+            <div class="row gpu-row">
+              <div class="field grow">
+                <label class="flabel" for="gpuEncode" data-i18n="settings.gpuAccel">GPU acceleration (NVIDIA)</label>
+                <select id="gpuEncode"></select>
+              </div>
+            </div>
+            <p class="check-note" data-i18n="settings.gpuNote">Detects your NVIDIA GPU and encodes
+              with the hardware encoder for much faster imports. Falls back to CPU if unavailable.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend data-i18n="console.jobLog">Job log</legend>
+            <div class="checks">
+              <div class="field-row">
+                <input type="checkbox" id="verboseLog">
+                <label for="verboseLog" data-i18n="settings.verboseLog">Detailed log</label>
+              </div>
+              <p class="check-note" data-i18n="settings.verboseLogNote">Shows full file paths and raw tool output.</p>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend data-i18n="settings.storage">Storage</legend>
+            <div class="row">
+              <div class="field grow">
+                <label class="flabel" for="outDir" data-i18n="settings.saveTo">Save downloads to</label>
+                <input type="text" id="outDir" spellcheck="false">
+              </div>
+              <button type="button" class="btn" id="browseBtn" data-i18n="settings.browse">Choose…</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="rig" id="rigBlock" title="Tools this panel drives"
+                   data-i18n-title="settings.toolsTitle">
+            <legend data-i18n="settings.system">System check</legend>
+            <ul class="rig-list">
+              <li class="rig-row wait" id="rigResolve">
+                <span class="rig-glyph" aria-hidden="true"></span>
+                <span class="rig-name" id="chipResolve">resolve-api</span>
+                <span class="rig-role" data-i18n="settings.roleResolve">DaVinci Resolve</span>
+                <span class="rig-state" id="stResolve" data-i18n="status.checking">checking…</span>
+              </li>
+              <li class="rig-row wait" id="rigYtdlp" title="checking…" data-i18n-title="status.checking">
+                <span class="rig-glyph" aria-hidden="true"></span>
+                <span class="rig-name" id="chipYtdlp">yt-dlp</span>
+                <span class="rig-role" data-i18n="settings.roleYtdlp">Downloader</span>
+                <span class="rig-state" id="stYtdlp" data-i18n="status.checking">checking…</span>
+              </li>
+              <li class="rig-row wait" id="rigFfmpeg" title="checking…" data-i18n-title="status.checking">
+                <span class="rig-glyph" aria-hidden="true"></span>
+                <span class="rig-name" id="chipFfmpeg">ffmpeg</span>
+                <span class="rig-role" data-i18n="settings.roleFfmpeg">Encoder</span>
+                <span class="rig-state" id="stFfmpeg" data-i18n="status.checking">checking…</span>
+              </li>
+              <li class="rig-row wait" id="rigDeno" title="checking…" data-i18n-title="status.checking">
+                <span class="rig-glyph" aria-hidden="true"></span>
+                <span class="rig-name" id="chipDeno">deno</span>
+                <span class="rig-role" data-i18n="settings.roleDeno">JS runtime (YouTube)</span>
+                <span class="rig-state" id="stDeno" data-i18n="status.checking">checking…</span>
+              </li>
+              <li class="rig-row wait" id="rigGpu" title="checking…" data-i18n-title="status.checking">
+                <span class="rig-glyph" aria-hidden="true"></span>
+                <span class="rig-name" id="chipGpu">nvidia</span>
+                <span class="rig-role" data-i18n="settings.roleGpu">NVIDIA GPU</span>
+                <span class="rig-state" id="stGpu" data-i18n="status.checking">checking…</span>
+              </li>
+            </ul>
+            <div class="rig-foot">
+              <span class="rig-summary" id="rigSummary" role="status" aria-live="polite"></span>
+              <div class="rig-btns">
+                <button type="button" class="btn btn-sm" id="checkUpdatesBtn"
+                        data-i18n="settings.checkUpdates">Check for updates</button>
+                <button type="button" class="btn btn-sm" id="recheckResolveBtn"
+                        data-i18n="settings.recheck">Check again</button>
+              </div>
+            </div>
+          </fieldset>
+
+        </div>
+      </div>
+
+      <!-- Tab panel: About -->
+      <div class="window tabpanel" id="aboutView" role="tabpanel" hidden>
+        <div class="window-body">
+
+          <fieldset class="about">
+            <legend data-i18n="settings.about">About</legend>
+            <p class="about-desc" data-i18n="about.desc">Grabtify is a DaVinci Resolve
+              Workflow Integration plugin for Windows. Paste a link, it downloads the clip
+              with yt-dlp, optionally trims it, and drops it onto your timeline.</p>
+            <div class="about-row">
+              <span class="about-key" data-i18n="about.version">Version</span>
+              <span class="about-value">Grabtify v1.0</span>
+            </div>
+            <div class="about-row">
+              <span class="about-key" data-i18n="about.author">Created by</span>
+              <span class="about-value">Pedro Gottardi</span>
+            </div>
+            <div class="about-row">
+              <span class="about-key" data-i18n="about.website">Website</span>
+              <a href="https://gottardi.vercel.app" target="_blank" rel="noopener noreferrer"
+                 class="creator-link">gottardi.vercel.app →</a>
+            </div>
+            <div class="about-row">
+              <span class="about-key" data-i18n="about.github">GitHub</span>
+              <a href="https://github.com/pedrogottardi/grabtify" target="_blank" rel="noopener noreferrer"
+                 class="creator-link">github.com/pedrogottardi/grabtify →</a>
+            </div>
+            <p class="legal-note" data-i18n="legal.text">Fetch only videos you own or are
+              licensed to download. Most platforms' terms restrict downloading, and this
+              tool does not bypass DRM.</p>
+            <a href="https://ko-fi.com/pedrogott" class="kofi-link" id="koFiLink"
+               data-i18n="settings.kofi">Buy me a coffee!</a>
+            <img class="about-header" src="header.png" alt="Grabtify">
+          </fieldset>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Status bar at the very bottom -->
+    <div class="status-bar">
+      <p class="status-bar-field status-line" id="statusLine" role="status" aria-live="polite"></p>
+      <p class="status-bar-field ver-field">Grabtify v1.0</p>
+    </div>
+
   </div>
 
-  <main class="card" id="mainView">
-    <div class="row">
-      <label class="field grow">
-        <span class="label" data-i18n="form.videoLink">Video link</span>
-        <input type="text" id="url" class="mono" spellcheck="false"
-               placeholder="https://www.youtube.com/watch?v=…" data-i18n-ph="form.urlPh"
-               autocomplete="off">
-      </label>
-      <label class="field mode-field">
-        <span class="label" data-i18n="form.mode">Mode</span>
-        <select id="mode"></select>
-      </label>
-    </div>
-
-    <div class="row">
-      <label class="field grow">
-        <span class="label video-only" data-i18n="form.maxQuality">Quality</span>
-        <span class="label audio-only" data-i18n="form.audioQuality" hidden>Audio quality</span>
-        <select id="quality" class="video-only"></select>
-        <select id="audioQuality" class="audio-only" hidden></select>
-      </label>
-      <label class="field grow">
-        <span class="label" data-i18n="form.insertAt">Insert clip at</span>
-        <select id="insertMode"></select>
-      </label>
-    </div>
-
-    <details class="trim" id="trimBlock">
-      <summary class="trim-summary">
-        <span data-i18n="form.trim">Trim clip</span>
-        <span class="caret" aria-hidden="true">▾</span>
-      </summary>
-      <div class="row tc-row trim-panel">
-        <label class="field">
-          <span class="label"><span data-i18n="form.inPoint">In point</span> <em data-i18n="form.optional">(optional)</em></span>
-          <input type="text" id="timeIn" class="mono tc" placeholder="0:00" data-i18n-ph="form.timePh" spellcheck="false">
-        </label>
-        <label class="field">
-          <span class="label"><span data-i18n="form.outPoint">Out point</span> <em data-i18n="form.optional">(optional)</em></span>
-          <input type="text" id="timeOut" class="mono tc" placeholder="0:00" data-i18n-ph="form.timePh" spellcheck="false">
-        </label>
-        <button type="button" class="btn ghost" id="clearTcBtn"
-                title="Clear the in/out points" data-i18n="form.clear"
-                data-i18n-title="form.clearTitle">clear</button>
+  <!-- Updates modal: a dialog window over the app window -->
+  <div class="modal-overlay" id="updatesModal" hidden>
+    <div class="window modal-card" role="dialog" aria-modal="true" aria-labelledby="updatesTitle">
+      <div class="title-bar">
+        <div class="title-bar-text" id="updatesTitle" data-i18n="updates.title">Binary updates</div>
       </div>
-    </details>
-
-    <p class="notice" id="encodeNotice" hidden data-i18n="form.encodeNotice">→ "Encode to MP4" will be turned on for this job</p>
-
-    <div class="actions">
-      <button type="button" class="btn primary" id="goBtn" data-i18n="form.grab">Grabtify to timeline</button>
-      <button type="button" class="btn danger" id="cancelBtn" hidden data-i18n="form.cancel">Cancel</button>
-      <button type="button" class="btn ghost" id="openBtn" data-i18n="form.openFolder">Open folder</button>
-    </div>
-  </main>
-
-  <section class="card settings" id="settingsView" hidden>
-
-    <div class="set-block">
-      <h2 class="section-title" data-i18n="settings.general">General</h2>
-      <div class="row">
-        <label class="field grow">
-          <span class="label" data-i18n="form.language">Language</span>
-          <select id="language"></select>
-        </label>
-      </div>
-    </div>
-
-    <div class="set-block">
-      <h2 class="section-title" data-i18n="settings.video">Video</h2>
-      <div class="row">
-        <label class="field grow">
-          <span class="label" data-i18n="settings.trimTiming">Trim timing</span>
-          <select id="trimMethod"></select>
-        </label>
-        <label class="field grow video-only manual-only">
-          <span class="label" data-i18n="settings.encodeQuality">Encode quality</span>
-          <select id="preset"></select>
-        </label>
-      </div>
-      <div class="checks video-only">
-        <label class="check">
-          <input type="checkbox" id="autoEncode">
-          <span data-i18n="settings.autoEncode">Encode automatically</span>
-        </label>
-        <p class="check-note" data-i18n="settings.autoEncodeNote">Converts unusual formats to H.264 MP4.</p>
-      </div>
-      <div class="checks video-only manual-only">
-        <label class="check">
-          <input type="checkbox" id="convert">
-          <span data-i18n="settings.encodeToMp4">Always encode to MP4</span>
-        </label>
-      </div>
-    </div>
-
-    <div class="set-block">
-      <h2 class="section-title" data-i18n="settings.storage">Storage</h2>
-      <div class="row">
-        <label class="field grow">
-          <span class="label" data-i18n="settings.saveTo">Save downloads to</span>
-          <input type="text" id="outDir" class="mono" spellcheck="false">
-        </label>
-        <button type="button" class="btn ghost" id="browseBtn" data-i18n="settings.browse">Choose…</button>
-      </div>
-    </div>
-
-    <div class="set-block rig" id="rigBlock" title="Tools this panel drives"
-         data-i18n-title="settings.toolsTitle">
-      <h2 class="section-title" data-i18n="settings.system">System check</h2>
-      <ul class="rig-list">
-        <li class="rig-row wait" id="rigResolve">
-          <span class="rig-glyph" aria-hidden="true"></span>
-          <span class="rig-name" id="chipResolve">resolve-api</span>
-          <span class="rig-role" data-i18n="settings.roleResolve">DaVinci Resolve</span>
-          <span class="rig-state" id="stResolve" data-i18n="status.checking">checking…</span>
-        </li>
-        <li class="rig-row wait" id="rigYtdlp" title="checking…" data-i18n-title="status.checking">
-          <span class="rig-glyph" aria-hidden="true"></span>
-          <span class="rig-name" id="chipYtdlp">yt-dlp</span>
-          <span class="rig-role" data-i18n="settings.roleYtdlp">Downloader</span>
-          <span class="rig-state" id="stYtdlp" data-i18n="status.checking">checking…</span>
-        </li>
-        <li class="rig-row wait" id="rigFfmpeg" title="checking…" data-i18n-title="status.checking">
-          <span class="rig-glyph" aria-hidden="true"></span>
-          <span class="rig-name" id="chipFfmpeg">ffmpeg</span>
-          <span class="rig-role" data-i18n="settings.roleFfmpeg">Encoder</span>
-          <span class="rig-state" id="stFfmpeg" data-i18n="status.checking">checking…</span>
-        </li>
-        <li class="rig-row wait" id="rigDeno" title="checking…" data-i18n-title="status.checking">
-          <span class="rig-glyph" aria-hidden="true"></span>
-          <span class="rig-name" id="chipDeno">deno</span>
-          <span class="rig-role" data-i18n="settings.roleDeno">JS runtime (YouTube)</span>
-          <span class="rig-state" id="stDeno" data-i18n="status.checking">checking…</span>
-        </li>
-      </ul>
-      <div class="rig-foot">
-        <span class="rig-summary" id="rigSummary" role="status" aria-live="polite"></span>
-        <div class="rig-btns">
-          <button type="button" class="btn ghost btn-sm" id="checkUpdatesBtn"
-                  data-i18n="settings.checkUpdates">Check for updates</button>
-          <button type="button" class="btn ghost btn-sm" id="recheckResolveBtn"
-                  data-i18n="settings.recheck">Check again</button>
+      <div class="window-body">
+        <p class="modal-sub" id="updatesSub" data-i18n="updates.sub">Newer versions are
+          available for the bundled tools.</p>
+        <ul class="upd-list" id="updatesList"></ul>
+        <p class="modal-note" id="updatesNote" data-i18n="updates.note">Updating replaces the
+          tools in bin\win. You will be asked to confirm once.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn default" id="updNowBtn"
+                  data-i18n="updates.updateNow">Update now</button>
+          <button type="button" class="btn" id="updLaterBtn"
+                  data-i18n="updates.later">Later</button>
         </div>
       </div>
     </div>
-
-    <p class="legal-note" data-i18n="legal.text">Fetch only videos you own or are
-      licensed to download. Most platforms' terms restrict downloading, and this
-      tool does not bypass DRM.</p>
-  </section>
-
-  <div class="modal-overlay" id="updatesModal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="updatesTitle">
-      <h2 class="modal-title" id="updatesTitle" data-i18n="updates.title">Binary updates</h2>
-      <p class="modal-sub" id="updatesSub" data-i18n="updates.sub">Newer versions are
-        available for the bundled tools.</p>
-      <ul class="upd-list" id="updatesList"></ul>
-      <p class="modal-note" id="updatesNote" data-i18n="updates.note">Updating replaces the
-        tools in bin\win. You will be asked to confirm once.</p>
-      <div class="modal-actions">
-        <button type="button" class="btn primary" id="updNowBtn"
-                data-i18n="updates.updateNow">Update now</button>
-        <button type="button" class="btn ghost" id="updLaterBtn"
-                data-i18n="updates.later">Later</button>
-      </div>
-    </div>
   </div>
-
-  <section class="console" aria-label="Job log" data-i18n-aria="console.jobLog">
-    <div class="console-head">
-      <span class="dot r" aria-hidden="true"></span>
-      <span class="dot y" aria-hidden="true"></span>
-      <span class="dot g" aria-hidden="true"></span>
-      <span data-i18n="console.jobLog">Job log</span>
-    </div>
-    <div class="log" id="log"></div>
-  </section>
-
-  <footer class="legal">
-    <span class="ver">Grabtify v1.0</span>
-    <a href="https://ko-fi.com/pedrogott" class="coffee" id="koFiLink"
-       data-i18n="settings.kofi">Buy me a coffee!</a>
-  </footer>
 
   <script src="js/i18n.js"></script>
   <script src="js/validation.js"></script>

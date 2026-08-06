@@ -38,6 +38,10 @@
     updNowBtn: $("updNowBtn"),
     updLaterBtn: $("updLaterBtn"),
     checkUpdatesBtn: $("checkUpdatesBtn"),
+    effect: $("effect"),
+    audioEffect: $("audioEffect"),
+    gpuEncode: $("gpuEncode"),
+    verboseLog: $("verboseLog"),
   };
 
   const state = {
@@ -117,9 +121,9 @@
     const s = stageEl(name);
     if (s) s.className = "stage-tok " + cls;
   }
-  function resetRail(encodeOn) {
+  function resetRail() {
     setStage("fetch", "idle");
-    setStage("encode", encodeOn ? "idle" : "skip");
+    setStage("encode", "idle");
     setStage("timeline", "idle");
     state.activeStage = null;
     state.pct = 0;
@@ -137,6 +141,41 @@
     document.querySelectorAll(".audio-only").forEach((n) => {
       n.hidden = mode !== "audio";
     });
+    if (el.effect) el.effect.disabled = mode === "audio";
+  }
+
+  // The video effect overrides the grab-tab encoding pre-sets, so the Max
+  // quality select is locked while one is active.
+  function applyEffectDisabled() {
+    if (!el.effect) return;
+    const locked = el.effect.value !== "off" && el.mode.value !== "audio";
+    el.quality.disabled = locked;
+  }
+
+  // Cached DOM nodes for the inline progress bar — created once, updated in
+  // place so CSS transitions on .prog-fill actually fire.
+  let _stgEl = null, _progTrack = null, _progFill = null, _labelText = null;
+
+  function buildRunningBar() {
+    const L = el.statusLine;
+    L.innerHTML = '';
+    _stgEl = document.createElement('span');
+    _stgEl.className = 'stg';
+    L.appendChild(_stgEl);
+    L.appendChild(document.createTextNode(' '));
+    _progTrack = document.createElement('span');
+    _progTrack.className = 'prog-track';
+    _progFill = document.createElement('span');
+    _progFill.className = 'prog-fill';
+    _progTrack.appendChild(_progFill);
+    L.appendChild(_progTrack);
+    L.appendChild(document.createTextNode(' '));
+    _labelText = document.createTextNode('');
+    L.appendChild(_labelText);
+  }
+
+  function clearBarCache() {
+    _stgEl = _progTrack = _progFill = _labelText = null;
   }
 
   function renderStatus() {
@@ -144,11 +183,13 @@
     if (!L) return;
     L.classList.remove("err", "indet");
     if (state.formErr) {
+      clearBarCache();
       L.classList.add("err");
       L.textContent = state.formErr;
       return;
     }
     if (!state.running) {
+      clearBarCache();
       if (state.doneMsg) { L.textContent = state.doneMsg; return; }
       if (state.titleFetching) {
         L.innerHTML = t("status.fetchingTitle") +
@@ -161,20 +202,19 @@
     }
     const stg = state.activeStage || "?";
     const label = state.progressLabel || "";
+    if (!_stgEl) buildRunningBar();
+    _stgEl.textContent = '[' + stg + ']';
     if (state.indet || state.pct === null) {
       L.classList.add("indet");
-      L.innerHTML =
-        '<span class="stg">[' + esc(stg) + ']</span> ' +
-        '<span class="bar-blocks">▚▚▚▚▚▚▚▚▚▚</span> — ' + esc(label);
+      _progTrack.classList.add("indet");
+      _progFill.style.width = '0%';
+      _labelText.textContent = label;
       return;
     }
-    let blocks = "";
-    const filled = Math.max(0, Math.min(10, Math.round(state.pct / 10)));
-    for (let i = 0; i < 10; i++) blocks += i < filled ? "▮" : "▯";
-    L.innerHTML =
-      '<span class="stg">[' + esc(stg) + ']</span> ' +
-      '<span class="bar-blocks">' + blocks + '</span> ' +
-      Math.round(state.pct) + '% — ' + esc(label);
+    const pct = Math.max(0, Math.min(100, state.pct));
+    _progTrack.classList.remove("indet");
+    _progFill.style.width = pct + '%';
+    _labelText.textContent = label;
   }
 
   // ------------------------------------------------------- field validation --
@@ -297,7 +337,7 @@
         setStage(ev.stage, ev.state);
         if (ev.state === "active") {
           state.activeStage = ev.stage;
-          if (ev.sub) { state.progressLabel = ev.sub; state.indet = true; }
+          if (ev.sub) { state.progressLabel = ev.sub; }
           renderStatus();
         } else if (ev.state === "error") {
           renderStatus();
@@ -320,6 +360,7 @@
         break;
       case "resolveStatus":
         applyResolveStatus(ev.ok, ev.message);
+        buttonFeedback($("recheckResolveBtn"), ev.ok ? t("settings.rechecked") : t("tools.failed"));
         break;
       case "updates":
         renderUpdates(ev.tools);
@@ -397,6 +438,14 @@
 
   function applyResolveStatus(ok, message) {
     setToken("stResolve", ok, message || "");
+  }
+
+  function applyGpuStatus(gpu) {
+    if (!gpu) return;
+    const tip = gpu.available
+      ? (gpu.label || t("settings.roleGpu"))
+      : t("status.gpuMissing");
+    setToken("stGpu", gpu.available, tip);
   }
 
   // ----------------------------------------------- binary update modal ---
@@ -480,23 +529,24 @@
         const api = pyApi();
         if (!api || !api.checkUpdates || state.running) return;
         const btn = el.checkUpdatesBtn;
-        btn.disabled = true;
+        buttonFeedback(btn, t("status.checking"));
         api.checkUpdates({ explicit: true })
           .then((res) => {
+            let outdated = false;
             if (res && res.tools) {
               renderUpdates(res.tools);
-              if (!res.tools.some((tool) => tool.outdated)) {
-                log(t("updates.noUpdate"), "ok");
-              }
+              outdated = res.tools.some((tool) => tool.outdated);
+              if (!outdated) log(t("updates.noUpdate"), "ok");
             } else if (res && res.skipped) {
               log(t("updates.noUpdate"), "ok");
             }
+            buttonFeedback(btn, outdated ? t("settings.foundUpdates") : t("settings.upToDate"));
           })
           .catch((e) => {
             log(t("status.couldNotStart", [t("settings.checkUpdates")]) + ": " +
               (e && e.message ? e.message : e), "err");
-          })
-          .then(() => { btn.disabled = false; });
+            buttonFeedback(btn, t("tools.failed"));
+          });
       });
     }
     if (el.updNowBtn) {
@@ -535,6 +585,7 @@
   // Option labels are i18n keys (settings.js keeps values stable); resolve
   // them here so switching language re-labels every dropdown.
   function fillSelect(c, pairs, current) {
+    if (!pairs) return;
     c.innerHTML = "";
     for (const pair of pairs) {
       const o = document.createElement("option");
@@ -543,6 +594,7 @@
       if (pair[0] === current) o.selected = true;
       c.appendChild(o);
     }
+    if (c._csSync) c._csSync();
   }
   function fillSelects(cfg) {
     fillSelect(el.quality, cfg.QUALITIES, cfg.settings.quality);
@@ -552,17 +604,130 @@
     fillSelect(el.trimMethod, cfg.TRIM_METHODS, cfg.settings.trimMethod);
     fillSelect(el.preset, cfg.PRESETS, cfg.settings.preset);
     fillSelect(el.language, cfg.LANGUAGES, cfg.settings.language);
+    fillSelect(el.effect, cfg.EFFECTS, cfg.settings.effect);
+    fillSelect(el.audioEffect, cfg.AUDIO_EFFECTS, cfg.settings.audioEffect);
+    fillSelect(el.gpuEncode, cfg.GPU_ENCODE_MODES, cfg.settings.gpuEncode);
     el.outDir.value = cfg.settings.outDir;
     el.convert.checked = !!cfg.settings.convert;
     el.autoEncode.checked = cfg.settings.autoEncode !== false;
+    el.verboseLog.checked = !!cfg.settings.verboseLog;
     el.preset.disabled = !el.convert.checked;
     applyMode(el.mode.value);
     applyAutoEncode();
+    applyEffectDisabled();
     updateNotice();
     // Keep the trim drawer open when points are set (e.g. after a language
     // switch), so an active cut is never hidden inside a collapsed panel.
     const trimDetails = $("trimBlock");
     if (trimDetails) trimDetails.open = !!(el.timeIn.value || el.timeOut.value);
+  }
+
+  // ------------------------------------------------- custom select (Win98) ---
+  // Hides the native <select> and builds a matching Win98-styled dropdown
+  // trigger + options list. The native select stays in the DOM as the source
+  // of truth for .value and "change" events so all existing wiring works.
+  function initCustomSelect(selectEl) {
+    if (selectEl._csInit) return;
+    selectEl._csInit = true;
+
+    // Ensure the parent is a positioning anchor for the options list.
+    var parent = selectEl.parentNode;
+    if (getComputedStyle(parent).position === "static") {
+      parent.style.position = "relative";
+    }
+
+    var opts = document.createElement("div");
+    opts.className = "cs-options";
+    opts.hidden = true;
+    opts.setAttribute("role", "listbox");
+    parent.insertBefore(opts, selectEl.nextSibling);
+
+    selectEl._csOpts = opts;
+
+    function syncFromNative() {
+      opts.innerHTML = "";
+      for (var i = 0; i < selectEl.options.length; i++) {
+        var o = selectEl.options[i];
+        var div = document.createElement("div");
+        div.className = "cs-option" + (o.selected ? " cs-selected" : "");
+        div.dataset.value = o.value;
+        div.textContent = o.textContent;
+        div.setAttribute("role", "option");
+        if (o.selected) div.setAttribute("aria-selected", "true");
+        opts.appendChild(div);
+      }
+    }
+    selectEl._csSync = syncFromNative;
+    syncFromNative();
+
+    var isOpen = false;
+    function openList() {
+      if (selectEl.disabled) return;
+      opts.hidden = false;
+      isOpen = true;
+      var sel = opts.querySelector(".cs-selected");
+      if (sel) { opts.scrollTop = sel.offsetTop - sel.offsetHeight; sel.classList.add("cs-hover"); }
+    }
+    function closeList() {
+      opts.hidden = true;
+      isOpen = false;
+      opts.querySelectorAll(".cs-option").forEach(function (i) { i.classList.remove("cs-hover"); });
+    }
+
+    // Intercept mousedown to prevent the native dropdown from opening.
+    selectEl.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      if (selectEl.disabled) return;
+      if (isOpen) closeList(); else openList();
+    });
+
+    opts.addEventListener("click", function (e) {
+      var opt = e.target.closest(".cs-option");
+      if (!opt) return;
+      selectEl.value = opt.dataset.value;
+      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+      syncFromNative();
+      closeList();
+      selectEl.focus();
+    });
+
+    opts.addEventListener("mousemove", function (e) {
+      var opt = e.target.closest(".cs-option");
+      if (!opt) return;
+      opts.querySelectorAll(".cs-option").forEach(function (i) { i.classList.remove("cs-hover"); });
+      opt.classList.add("cs-hover");
+    });
+
+    opts.addEventListener("keydown", function (e) {
+      var items = Array.from(opts.querySelectorAll(".cs-option"));
+      var cur = opts.querySelector(".cs-hover") || opts.querySelector(".cs-selected");
+      var idx = items.indexOf(cur);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        items.forEach(function (i) { i.classList.remove("cs-hover"); });
+        idx = Math.min(idx + 1, items.length - 1);
+        if (items[idx]) items[idx].classList.add("cs-hover");
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        items.forEach(function (i) { i.classList.remove("cs-hover"); });
+        idx = Math.max(idx - 1, 0);
+        if (items[idx]) items[idx].classList.add("cs-hover");
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (cur) cur.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeList();
+        selectEl.focus();
+      }
+    });
+
+    document.addEventListener("click", function (e) {
+      if (isOpen && !opts.contains(e.target) && e.target !== selectEl) closeList();
+    });
+
+    var obs = new MutationObserver(syncFromNative);
+    obs.observe(selectEl, { attributes: true, attributeFilter: ["disabled"] });
   }
 
   // The "Automatic encoding" switch hides the manual encode controls. When it
@@ -578,15 +743,6 @@
     if (el.preset) el.preset.disabled = hide || !el.convert.checked;
   }
 
-  // Whether the ENCODE stage will do real work on the next run (audio always,
-  // manual convert, or an "encode-time" trim). With automatic mode alone we
-  // can't know until the download lands, so the token stays neutral.
-  function railEncodeOn() {
-    return el.mode.value === "audio" || el.convert.checked ||
-      (el.autoEncode.checked && el.trimMethod.value === "ffmpeg" &&
-       !!(el.timeIn.value.trim() || el.timeOut.value.trim()));
-  }
-
   // ------------------------------------------------------------- settings ---
   function gatherSettings() {
     return {
@@ -599,6 +755,10 @@
       outDir: el.outDir.value,
       convert: el.convert.checked,
       autoEncode: el.autoEncode.checked,
+      effect: el.effect.value,
+      audioEffect: el.audioEffect.value,
+      gpuEncode: el.gpuEncode.value,
+      verboseLog: el.verboseLog.checked,
       language: el.language.value,
     };
   }
@@ -637,6 +797,7 @@
 
   function finishRun(ok, message) {
     state.running = false;
+    document.body.classList.remove("busy");
     state.doneMsg = message || (ok ? t("status.finishedOk") : t("status.finishedFail"));
     setFormEnabled(true);
     if (ok) {
@@ -700,10 +861,28 @@
       out_dir: (el.outDir.value || "").trim(),
     };
 
+    // Video effects need the encode stage (ffmpeg filter chain), so any
+    // active effect forces the re-encode regardless of the other settings.
+    const fx = el.effect ? el.effect.value : "off";
+    if (fx !== "off" && mode !== "audio") {
+      opts.effect = fx;
+      opts.convert = true;
+      opts.auto_encode = true;
+    }
+
+    // Audio effects need the encode stage too (ffmpeg -af chain) and apply in
+    // both video and audio modes, so they force the re-encode as well.
+    const afx = el.audioEffect ? el.audioEffect.value : "off";
+    if (afx !== "off") {
+      opts.audio_effect = afx;
+      opts.convert = true;
+      opts.auto_encode = true;
+    }
+
     saveSettings();
-    resetRail(opts.mode === "audio" || opts.convert ||
-      (opts.auto_encode && opts.trim && opts.trim_method === "ffmpeg"));
+    resetRail();
     state.running = true;
+    document.body.classList.add("busy");
     state.doneMsg = null;
     titleSeq++;
     state.titleFetching = false;
@@ -728,6 +907,25 @@
     log(t("boot.cancelling"), "note");
     const api = pyApi();
     if (api && api.cancelJob) api.cancelJob();
+  }
+
+  // Temporarily swaps a settings button's label with an inline result message
+  // ("Checking…", "All up to date!", …) and re-enables it afterwards. A newer
+  // call supersedes an in-flight flash; the label is restored from the live
+  // i18n key so a language switch mid-flash stays consistent.
+  function buttonFeedback(btn, msg, ms) {
+    if (!btn) return;
+    btn.__flashToken = (btn.__flashToken || 0) + 1;
+    const token = btn.__flashToken;
+    const i18nKey = btn.getAttribute("data-i18n");
+    btn.textContent = msg;
+    btn.disabled = true;
+    setTimeout(() => {
+      if (btn.__flashToken === token) {
+        btn.textContent = i18nKey ? t(i18nKey) : (btn.__origLabel || btn.textContent);
+        btn.disabled = false;
+      }
+    }, ms || 3000);
   }
 
   // ------------------------------------------------------------- wiring ---
@@ -775,7 +973,6 @@
     });
   }
   wireExternal($("koFiLink"));
-  wireExternal($("koFiHeaderBtn"));
 
   el.browse.addEventListener("click", () => {
     const api = pyApi();
@@ -788,33 +985,43 @@
   el.convert.addEventListener("change", () => {
     el.preset.disabled = !el.convert.checked;
     updateNotice();
-    resetRail(railEncodeOn());
+    resetRail();
     saveSettings();
   });
 
   el.autoEncode.addEventListener("change", () => {
     applyAutoEncode();
     updateNotice();
-    resetRail(railEncodeOn());
+    resetRail();
     saveSettings();
   });
 
   el.mode.addEventListener("change", () => {
     applyMode(el.mode.value);
+    applyEffectDisabled();
     updateNotice();
-    resetRail(railEncodeOn());
+    resetRail();
     saveSettings();
   });
 
   el.trimMethod.addEventListener("change", () => {
     updateNotice();
-    resetRail(railEncodeOn());
+    resetRail();
     saveSettings();
   });
 
-  for (const id of ["quality", "audioQuality", "preset", "insertMode"]) {
+  for (const id of ["quality", "audioQuality", "preset", "insertMode", "verboseLog"]) {
     $(id).addEventListener("change", saveSettings);
   }
+  el.effect.addEventListener("change", () => {
+    applyEffectDisabled();
+    saveSettings();
+    resetRail();
+  });
+  el.audioEffect.addEventListener("change", () => {
+    saveSettings();
+    resetRail();
+  });
   el.outDir.addEventListener("change", saveSettings);
 
   // Field errors clear as you type.
@@ -844,29 +1051,32 @@
     saveSettings();
   });
 
-  // Settings gear toggle
-  const gear = $("settingsBtn");
-  const main = $("mainView");
-  const settings = $("settingsView");
-  const consoleEl = document.querySelector(".console");
-  const statusEl = document.querySelector(".status");
-  if (gear && main && settings) {
-    gear.addEventListener("click", () => {
-      const opening = settings.hasAttribute("hidden");
-      if (opening) { settings.removeAttribute("hidden"); main.setAttribute("hidden", ""); }
-      else { settings.setAttribute("hidden", ""); main.removeAttribute("hidden"); }
-      if (consoleEl) {
-        if (opening) consoleEl.setAttribute("hidden", "");
-        else consoleEl.removeAttribute("hidden");
+  // Grab / Settings / About tabs. The log console and status bar stay visible
+  // on all tabs; only the selected tab panel is shown.
+  const tabs = document.querySelectorAll('#tabStrip [role="tab"]');
+  const tabPanels = {
+    main: $("mainView"),
+    settings: $("settingsView"),
+    about: $("aboutView"),
+  };
+  for (const tab of tabs) {
+    tab.addEventListener("click", (e) => {
+      e.preventDefault();
+      const name = tab.getAttribute("data-tab");
+      for (const [key, panel] of Object.entries(tabPanels)) {
+        if (panel) panel.toggleAttribute("hidden", key !== name);
       }
-      if (statusEl) {
-        if (opening) statusEl.setAttribute("hidden", "");
-        else statusEl.removeAttribute("hidden");
+      for (const t of tabs) {
+        t.setAttribute("aria-selected", t === tab ? "true" : "false");
       }
-      gear.className = "icon-btn" + (opening ? " active" : "");
-      gear.setAttribute("aria-expanded", opening ? "true" : "false");
     });
   }
+
+  // Titlebar window controls (frameless window).
+  const minimizeBtn = $("minimizeBtn");
+  const closeBtn = $("closeBtn");
+  if (minimizeBtn) minimizeBtn.addEventListener("click", () => { window.grabtify.minimize(); });
+  if (closeBtn) closeBtn.addEventListener("click", () => { window.grabtify.close(); });
 
   // Timecode auto-grouping — same behaviour as YOINK! Colons are inserted
   // automatically while typing, grouping right-to-left from the digit count:
@@ -911,7 +1121,12 @@
   if (recheckBtn) {
     recheckBtn.addEventListener("click", () => {
       const api = pyApi();
-      if (api && api.recheckResolve) api.recheckResolve();
+      if (api && api.recheckResolve) {
+        buttonFeedback(recheckBtn, t("status.checking"));
+        api.recheckResolve().then((res) => {
+          if (res && res.gpu) applyGpuStatus(res.gpu);
+        }).catch(() => {});
+      }
     });
   }
 
@@ -946,13 +1161,15 @@
         if (window.GrabtifyI18n) window.GrabtifyI18n.setLanguage(cfg.settings.language || "en");
         lastCfg = cfg;
         fillSelects(cfg);
-        resetRail(railEncodeOn());
+        document.querySelectorAll("select:not(.cs-init)").forEach(initCustomSelect);
+        resetRail();
         if (cfg.tools) applyToolStatus(cfg.tools);
         applyResolveStatus(cfg.resolve_ok, cfg.resolve_msg);
+        applyGpuStatus(cfg.gpu);
         applyLanguage();
         renderStatus();
         log(t("boot.ready"));
-        log(t("boot.toolsNote"), "note");
+        if (el.verboseLog.checked) log(t("boot.toolsNote"), "note");
         autoCheckUpdates();
       }
       hideBoot();

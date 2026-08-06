@@ -196,6 +196,70 @@ test("settings autoEncode defaults true and round-trips", () => {
   assert.strictEqual(settings.load().autoEncode, before.autoEncode);
 });
 
+test("settings gpuEncode defaults to auto, round-trips, and normalizes junk", () => {
+  assert.strictEqual(settings.DEFAULTS.gpuEncode, "auto");
+  const before = settings.load();
+  assert.strictEqual(before.gpuEncode, "auto");
+  settings.save(Object.assign({}, before, { gpuEncode: "on" }));
+  assert.strictEqual(settings.load().gpuEncode, "on");
+  settings.save(Object.assign({}, before, { gpuEncode: "bogus" }));
+  assert.strictEqual(settings.load().gpuEncode, "auto");
+  settings.save(before);
+});
+
+test("settings verboseLog defaults to false, round-trips booleans", () => {
+  assert.strictEqual(settings.DEFAULTS.verboseLog, false);
+  const before = settings.load();
+  assert.strictEqual(before.verboseLog, false);
+  settings.save(Object.assign({}, before, { verboseLog: true }));
+  assert.strictEqual(settings.load().verboseLog, true);
+  settings.save(Object.assign({}, before, { verboseLog: false }));
+  assert.strictEqual(settings.load().verboseLog, false);
+  settings.save(before);
+});
+
+test("settings verboseLog normalizes non-boolean to default", () => {
+  const before = settings.load();
+  settings.save(Object.assign({}, before, { verboseLog: "yes" }));
+  assert.strictEqual(settings.load().verboseLog, false);
+  settings.save(Object.assign({}, before, { verboseLog: null }));
+  assert.strictEqual(settings.load().verboseLog, false);
+  settings.save(before);
+});
+
+test("GPU_ENCODE_MODES drives the gpu dropdown and each label resolves", () => {
+  assert.strictEqual(settings.GPU_ENCODE_MODES[0][0], "auto");
+  for (const pair of settings.GPU_ENCODE_MODES) {
+    const label = i18n.translate("en", pair[1]);
+    assert.ok(label && label !== pair[1], "label " + pair[1] + " must resolve");
+    const pt = i18n.translate("pt-BR", pair[1]);
+    assert.ok(pt && pt !== pair[1], "pt-BR label " + pair[1] + " must resolve");
+  }
+});
+
+test("i18n new job log keys resolve in both languages", () => {
+  const en = i18n.translate("en", "job.savedTo");
+  assert.ok(en && en.includes(": {0}", "savedTo resolves"));
+  for (const k of [
+    "job.convertingVideo", "job.convertingAudio", "job.trimmingTo",
+    "job.toolMissing", "job.downloadFailed", "job.encodeFailed", "job.gpuFallback"
+  ]) {
+    const enText = i18n.translate("en", k);
+    const ptText = i18n.translate("pt-BR", k);
+    assert.ok(enText && enText !== k, "en label " + k + " resolves");
+    assert.ok(ptText && ptText !== k, "pt-BR label " + k + " resolves");
+  }
+});
+
+test("i18n verbose log settings keys resolve in both languages", () => {
+  for (const k of ["settings.verboseLog", "settings.verboseLogNote"]) {
+    const enText = i18n.translate("en", k);
+    const ptText = i18n.translate("pt-BR", k);
+    assert.ok(enText && enText !== k, "en label " + k + " resolves");
+    assert.ok(ptText && ptText !== k, "pt-BR label " + k + " resolves");
+  }
+});
+
 test("shouldEncode covers audio, manual convert, ffmpeg trim, and auto detection", () => {
   const base = {
     mode: "video", convert: false, auto_encode: true,
@@ -218,6 +282,32 @@ test("isResolveReady returns false when the probe fails", () => {
   } finally {
     fs.unlinkSync(f);
   }
+});
+
+test("main.js boot payload exposes every settings dropdown array", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf-8");
+  for (const key of ["QUALITIES", "AUDIO_QUALITIES", "MODES", "INSERT_MODES",
+                     "TRIM_METHODS", "PRESETS", "EFFECTS", "AUDIO_EFFECTS",
+                     "LANGUAGES", "GPU_ENCODE_MODES"]) {
+    assert.ok(
+      new RegExp("^\\s*" + key + ": settingsMod\\." + key + ",", "m").test(src),
+      "boot payload must expose " + key);
+  }
+  assert.ok(/\bgpu: detectGpuCached\(\),/.test(src), "boot payload must expose gpu");
+});
+
+test("main.js start-job maps every renderer option into jobOpts", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf-8");
+  const block = src.split("grabtify:start-job")[1] || "";
+  for (const field of ["mode", "quality", "preset", "convert", "auto_encode",
+                       "insert_mode", "audio_quality", "effect", "audio_effect"]) {
+    assert.ok(
+      new RegExp("^\\s*" + field + ": opts\\.", "m").test(block),
+      "start-job must map " + field + " into jobOpts");
+  }
+  assert.ok(/\n\s*gpu_encode: gpuEncodeForJob\(\),/.test(block), "start-job must map gpu_encode");
+  assert.ok(/\n\s*verbose_log: !!opts\.verbose_log,/.test(block), "start-job must map verbose_log");
+  assert.ok(/\n\s*out_dir: outDir,/.test(block), "start-job must map out_dir into jobOpts");
 });
 
 test("newestMediaFile finds the newest media file deterministically", () => {
@@ -249,6 +339,17 @@ test("quickCheckAll returns {ok, version, err} objects per tool", () => {
     assert.strictEqual(typeof r[name].ok, "boolean");
     assert.strictEqual(typeof r[name].version, "string");
     assert.strictEqual(typeof r[name].err, "string");
+  }
+});
+
+test("detectGpu reports a well-formed GPU status without throwing", () => {
+  const gpu = tools.detectGpu();
+  assert.strictEqual(typeof gpu.available, "boolean");
+  assert.strictEqual(typeof gpu.label, "string");
+  assert.strictEqual(typeof gpu.encoder, "string");
+  if (gpu.available) {
+    assert.ok(gpu.label.length > 0, "available GPU must have a name");
+    assert.strictEqual(gpu.encoder, "h264_nvenc");
   }
 });
 
@@ -542,4 +643,350 @@ test("LANGUAGES drives the language dropdown and each label resolves", () => {
     const label = i18n.translate("en", pair[1]);
     assert.ok(label && label !== pair[1], "label " + pair[1] + " must resolve");
   }
+});
+
+test("EFFECTS drives the effect dropdown and each label resolves", () => {
+  assert.strictEqual(settings.EFFECTS[0][0], "off");
+  assert.deepStrictEqual(settings.EFFECTS[0], ["off", "fx.off"]);
+  for (const pair of settings.EFFECTS) {
+    const label = i18n.translate("en", pair[1]);
+    assert.ok(label && label !== pair[1], "label " + pair[1] + " must resolve");
+    const pt = i18n.translate("pt-BR", pair[1]);
+    assert.ok(pt && pt !== pair[1], "pt-BR label " + pair[1] + " must resolve");
+  }
+});
+
+test("AUDIO_EFFECTS drives the audio effect dropdown and each label resolves", () => {
+  assert.strictEqual(settings.AUDIO_EFFECTS[0][0], "off");
+  assert.deepStrictEqual(settings.AUDIO_EFFECTS[0], ["off", "af.off"]);
+  for (const pair of settings.AUDIO_EFFECTS) {
+    const label = i18n.translate("en", pair[1]);
+    assert.ok(label && label !== pair[1], "label " + pair[1] + " must resolve");
+    const pt = i18n.translate("pt-BR", pair[1]);
+    assert.ok(pt && pt !== pair[1], "pt-BR label " + pair[1] + " must resolve");
+  }
+});
+
+test("settings effect is session-only: defaults to off and never restores from disk", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-effect-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    assert.strictEqual(settings.DEFAULTS.effect, "off");
+    assert.strictEqual(settings.load().effect, "off");
+    settings.save(Object.assign(settings.load(), { effect: "noir" }));
+    assert.strictEqual(settings.load().effect, "off");
+    settings.save(Object.assign(settings.load(), { effect: "bogus-fx" }));
+    assert.strictEqual(settings.load().effect, "off");
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("settings audioEffect is session-only: defaults to off and never restores from disk", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-audio-effect-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    assert.strictEqual(settings.DEFAULTS.audioEffect, "off");
+    assert.strictEqual(settings.load().audioEffect, "off");
+    settings.save(Object.assign(settings.load(), { audioEffect: "reverb" }));
+    assert.strictEqual(settings.load().audioEffect, "off");
+    settings.save(Object.assign(settings.load(), { audioEffect: "bogus-af" }));
+    assert.strictEqual(settings.load().audioEffect, "off");
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shouldEncode forces a re-encode when an effect is active", () => {
+  const base = {
+    mode: "video", convert: false, auto_encode: true,
+    trim: false, trim_method: "download",
+  };
+  assert.strictEqual(pipeline.shouldEncode(Object.assign({}, base, { effect: "noir" }), true), true);
+  assert.strictEqual(pipeline.shouldEncode(Object.assign({}, base, { effect: "mosh" }), false), true);
+  assert.strictEqual(pipeline.shouldEncode(Object.assign({}, base, { effect: "off" }), true), false);
+  assert.strictEqual(pipeline.shouldEncode(base, true), false);
+});
+
+test("shouldEncode forces a re-encode when an audio effect is active", () => {
+  const base = {
+    mode: "video", convert: false, auto_encode: true,
+    trim: false, trim_method: "download",
+  };
+  assert.strictEqual(pipeline.shouldEncode(Object.assign({}, base, { audio_effect: "bass" }), true), true);
+  assert.strictEqual(pipeline.shouldEncode(Object.assign({}, base, { audio_effect: "reverse" }), false), true);
+  assert.strictEqual(pipeline.shouldEncode(Object.assign({}, base, { audio_effect: "off" }), true), false);
+  assert.strictEqual(pipeline.shouldEncode(Object.assign({}, base, { mode: "audio", audio_effect: "off" }), true), true);
+});
+
+test("effectArgs maps every experimental effect to a filter chain", () => {
+  const vf = (e) => pipeline.effectArgs(e, false);
+  assert.strictEqual(vf("off"), null);
+  assert.strictEqual(vf(null), null);
+  assert.strictEqual(vf(undefined), null);
+  assert.strictEqual(vf(""), null);
+  assert.strictEqual(vf("not-an-effect"), null);
+  for (const e of ["smear", "mosh", "glitch", "vhs", "pixel", "tiny240", "poster", "noir", "crt", "trail"]) {
+    assert.ok(vf(e), e + " must produce a descriptor");
+  }
+  assert.match(vf("smear").filterComplex, /blend=all_mode=difference/);
+  assert.match(vf("glitch").vf, /rgbashift/);
+  assert.match(vf("pixel").vf, /flags=neighbor/);
+  assert.match(vf("tiny240").vf, /scale=-2:240/);
+  assert.match(vf("noir").vf, /hue=s=0/);
+  assert.match(vf("crt").vf, /geq/);
+  assert.match(vf("trail").vf, /tmix/);
+  assert.match(vf("poster").filterComplex, /palettegen/);
+  assert.strictEqual(vf("mosh").prep, "mosh");
+  assert.match(vf("mosh").filterComplex, /\[1:v\]/);
+  assert.strictEqual(vf("mosh").longGop, true);
+});
+
+test("audioEffectArgs maps every audio effect to an -af chain", () => {
+  const af = (e) => pipeline.audioEffectArgs(e);
+  assert.strictEqual(af("off"), null);
+  assert.strictEqual(af(null), null);
+  assert.strictEqual(af(undefined), null);
+  assert.strictEqual(af(""), null);
+  assert.strictEqual(af("not-an-effect"), null);
+  for (const e of ["echo", "reverb", "radio", "nightcore", "deep", "bass", "tremolo", "crush", "reverse"]) {
+    assert.ok(typeof af(e) === "string" && af(e).length > 0, e + " must produce an -af chain");
+  }
+  assert.match(af("echo"), /aecho/);
+  assert.match(af("reverb"), /aecho=0\.8:0\.88:60:0\.4/);
+  assert.match(af("radio"), /highpass=f=300/);
+  assert.match(af("nightcore"), /asetrate=44100\*1\.15/);
+  assert.match(af("deep"), /asetrate=44100\*0\.85/);
+  assert.match(af("bass"), /bass=g=6:f=100/);
+  assert.match(af("tremolo"), /tremolo=f=5:d=0\.7/);
+  assert.match(af("crush"), /acrusher/);
+  assert.strictEqual(af("reverse"), "areverse");
+});
+
+test("videoEncoderArgs picks NVIDIA NVENC on GPU and libx264 on CPU", () => {
+  const cpu = pipeline.videoEncoderArgs(false, 21, false);
+  assert.deepStrictEqual(cpu, ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p"]);
+  const gpu = pipeline.videoEncoderArgs(true, 18, false);
+  assert.deepStrictEqual(gpu,
+    ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "18", "-b:v", "0", "-pix_fmt", "yuv420p"]);
+  const cpuLong = pipeline.videoEncoderArgs(false, 18, true);
+  assert.ok(cpuLong.includes("-sc_threshold"), "CPU longGop keeps the x264 scene-cut option");
+  assert.ok(cpuLong.includes("-bf"), "CPU longGop keeps -bf");
+  const gpuLong = pipeline.videoEncoderArgs(true, 18, true);
+  assert.ok(gpuLong.includes("-g"), "GPU longGop keeps the keyframe interval");
+  assert.ok(!gpuLong.includes("sc_threshold"), "GPU path must drop the x264-only sc_threshold");
+  assert.ok(!gpuLong.includes("-bf"), "GPU path must drop -bf");
+});
+
+test("effectArgs VHS degrades audio only when the source has audio", () => {
+  const silent = pipeline.effectArgs("vhs", false);
+  assert.ok(silent.vf, "silent VHS uses a plain -vf chain");
+  assert.strictEqual(silent.filterComplex, undefined);
+  assert.ok(silent.vf.includes("scale=-2:480"));
+  const noisy = pipeline.effectArgs("vhs", true);
+  assert.ok(noisy.filterComplex, "VHS with audio uses a graph");
+  assert.strictEqual(noisy.vf, undefined);
+  assert.ok(noisy.filterComplex.includes("amix"));
+  assert.ok(noisy.filterComplex.includes("normalize=0"));
+  assert.ok(noisy.filterComplex.includes("alimiter"));
+  assert.ok(noisy.filterComplex.includes("aresample=22050"));
+  assert.ok(noisy.filterComplex.includes("highpass=f=100"));
+  assert.strictEqual(noisy.mapAudio, "[amix]");
+  assert.strictEqual(noisy.shortest, true);
+});
+
+test("effectArgs pixel and tiny240 add lo-fi audio only when the source has audio", () => {
+  for (const fx of ["pixel", "tiny240"]) {
+    const silent = pipeline.effectArgs(fx, false);
+    assert.ok(silent.vf, fx + " without audio stays a plain -vf chain");
+    assert.strictEqual(silent.filterComplex, undefined);
+    const noisy = pipeline.effectArgs(fx, true);
+    assert.ok(noisy.filterComplex, fx + " with audio uses a graph");
+    assert.strictEqual(noisy.vf, undefined);
+    assert.ok(noisy.filterComplex.includes("[0:a]"), fx + " must filter the audio stream");
+    assert.strictEqual(noisy.mapAudio, "[amix]");
+  }
+  assert.ok(pipeline.effectArgs("pixel", true).filterComplex.includes("aresample=11025"));
+  assert.ok(pipeline.effectArgs("tiny240", true).filterComplex.includes("aresample=8000"));
+  assert.ok(pipeline.effectArgs("tiny240", true).filterComplex.includes("channel_layouts=mono"));
+});
+
+test("pickOutFile stamps a unique timestamped output name", () => {
+  const now = new Date(2026, 7, 5, 19, 8, 45);
+  assert.strictEqual(
+    pipeline.pickOutFile("C:/v/clip", false, now, () => false),
+    "C:/v/clip-converted-20260805-190845.mp4"
+  );
+  assert.strictEqual(
+    pipeline.pickOutFile("C:/v/clip", true, now, () => false),
+    "C:/v/clip-20260805-190845.mp3"
+  );
+  const later = new Date(2026, 7, 5, 19, 8, 46);
+  assert.notStrictEqual(
+    pipeline.pickOutFile("C:/v/clip", false, later, () => false),
+    "C:/v/clip-converted-20260805-190845.mp4"
+  );
+});
+
+test("pickOutFile falls back to a numeric suffix on collision", () => {
+  const now = new Date(2026, 7, 5, 19, 8, 45);
+  const stem = "C:/v/clip-converted-20260805-190845";
+  const exists = (p) => p === stem + ".mp4" || p === stem + "-2.mp4";
+  assert.strictEqual(
+    pipeline.pickOutFile("C:/v/clip", false, now, exists),
+    stem + "-3.mp4"
+  );
+});
+
+test("datamoshPrep produces a playable Xvid intermediate (needs ffmpeg)", { skip: !tools.checkTool("ffmpeg").ok }, async () => {
+  const ffmpeg = tools.resolveTool("ffmpeg").cmd;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-mosh-"));
+  const src = path.join(dir, "src.mp4");
+  const st = require("node:child_process").spawnSync(ffmpeg,
+    ["-y", "-hide_banner", "-loglevel", "error",
+     "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=2",
+     "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+     "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+     "-c:a", "aac", "-shortest", src],
+    { encoding: "utf-8", windowsHide: true });
+  assert.strictEqual(st.status, 0, "test clip must be created");
+  assert.ok(fs.existsSync(src));
+  const cancelState = { cancelled: false, child: null };
+  try {
+    const avi = await pipeline.datamoshPrep(src, { trim: false }, cancelState, () => {});
+    assert.ok(avi.endsWith(".avi"), "intermediate is an AVI");
+    assert.ok(fs.statSync(avi).size > 0, "intermediate is not empty");
+    const probe = require("node:child_process").spawnSync(ffmpeg,
+      ["-i", avi], { encoding: "utf-8", windowsHide: true });
+    const text = probe.stderr || "";
+    assert.ok(/Video:/.test(text), "intermediate decodes as video");
+    assert.ok(/_xvid|mpeg4/.test(text), "intermediate is Xvid/MPEG-4");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audio effect in audio mode applies -af and yields a playable MP3 (needs ffmpeg)", { skip: !tools.checkTool("ffmpeg").ok }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-afx-mp3-"));
+  const src = path.join(dir, "src.mp4");
+  const st = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+    ["-y", "-hide_banner", "-loglevel", "error",
+     "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+     "-c:a", "aac", src],
+    { encoding: "utf-8", windowsHide: true });
+  assert.strictEqual(st.status, 0, "test clip must be created");
+  const cancelState = { cancelled: false, child: null };
+  try {
+    const out = await pipeline.encode(src,
+      { mode: "audio", audio_quality: "128", audio_effect: "bass", auto_encode: true },
+      cancelState, () => {});
+    assert.ok(/\.mp3$/.test(out), "audio mode produces an mp3");
+    const probe = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+      ["-i", out], { encoding: "utf-8", windowsHide: true });
+    assert.ok(/Audio:/.test(probe.stderr || ""), "mp3 decodes with an audio stream");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audio effect composes into a filter-graph effect and yields a playable MP4 (needs ffmpeg)", { skip: !tools.checkTool("ffmpeg").ok }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-afx-graph-"));
+  const src = path.join(dir, "src.mp4");
+  const st = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+    ["-y", "-hide_banner", "-loglevel", "error",
+     "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2",
+     "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+     "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+     "-c:a", "aac", "-shortest", src],
+    { encoding: "utf-8", windowsHide: true });
+  assert.strictEqual(st.status, 0, "test clip must be created");
+  const cancelState = { cancelled: false, child: null };
+  try {
+    const out = await pipeline.encode(src,
+      { mode: "video", effect: "pixel", audio_effect: "echo", auto_encode: true },
+      cancelState, () => {});
+    assert.ok(/\.mp4$/.test(out), "video mode produces an mp4");
+    const probe = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+      ["-i", out], { encoding: "utf-8", windowsHide: true });
+    const text = probe.stderr || "";
+    assert.ok(/Video:/.test(text), "mp4 decodes with a video stream");
+    assert.ok(/Audio:/.test(text), "mp4 decodes with an audio stream");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("GPU encode produces a playable H.264 MP4 (needs NVIDIA + ffmpeg)", { skip: !tools.detectGpu().available }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-gpu-"));
+  const src = path.join(dir, "src.mp4");
+  const st = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+    ["-y", "-hide_banner", "-loglevel", "error",
+     "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2",
+     "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", src],
+    { encoding: "utf-8", windowsHide: true });
+  assert.strictEqual(st.status, 0, "test clip must be created");
+  const cancelState = { cancelled: false, child: null };
+  try {
+    const out = await pipeline.encode(src,
+      { mode: "video", gpu_encode: true, auto_encode: true },
+      cancelState, () => {});
+    assert.ok(/\.mp4$/.test(out), "video mode produces an mp4");
+    const probe = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+      ["-i", out], { encoding: "utf-8", windowsHide: true });
+    const text = probe.stderr || "";
+    assert.ok(/h264/.test(text), "mp4 is H.264 encoded");
+    assert.ok(/Video:/.test(text), "mp4 decodes with a video stream");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("encode job emit events differ between concise and verbose modes", { skip: !tools.detectGpu().available }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-verbose-"));
+  const src = path.join(dir, "src.mp4");
+  const st = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+    ["-y", "-hide_banner", "-loglevel", "error",
+     "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30:duration=1.5", src],
+    { encoding: "utf-8", windowsHide: true });
+  assert.strictEqual(st.status, 0);
+
+  // Concise mode test with its own source file
+  const conciseDir = fs.mkdtempSync(path.join(dir, "concise-"));
+  const conciseSrc = path.join(conciseDir, "src.mp4");
+  const st2 = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+    ["-y", "-hide_banner", "-loglevel", "error",
+     "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30:duration=1.5", conciseSrc],
+    { encoding: "utf-8", windowsHide: true });
+  assert.strictEqual(st2.status, 0);
+  const cancelState1 = { cancelled: false, child: null };
+  const conciseLines = [];
+  await pipeline.encode(conciseSrc,
+    { mode: "video", verbose_log: false, auto_encode: true },
+    cancelState1, (ev) => { if (ev.type === "log") conciseLines.push(ev.line); });
+  assert.ok(conciseLines.find(l => l && l.trim()).includes("Converting"),
+    "concise mode emits friendly wording ('Converting video…')");
+
+  // Verbose mode test with its own source file
+  const verboseDir = fs.mkdtempSync(path.join(dir, "verbose-"));
+  const verboseSrc = path.join(verboseDir, "src.mp4");
+  const st3 = require("node:child_process").spawnSync(tools.resolveTool("ffmpeg").cmd,
+    ["-y", "-hide_banner", "-loglevel", "error",
+     "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30:duration=1.5", verboseSrc],
+    { encoding: "utf-8", windowsHide: true });
+  assert.strictEqual(st3.status, 0);
+  const cancelState2 = { cancelled: false, child: null };
+  const verboseLines = [];
+  await pipeline.encode(verboseSrc,
+    { mode: "video", verbose_log: true, auto_encode: true },
+    cancelState2, (ev) => { if (ev.type === "log") verboseLines.push(ev.line); });
+  assert.ok(verboseLines.find(l => l && l.includes("H.264")) ||
+           verboseLines.find(l => l && l.includes("CRF")),
+    "verbose mode emits detailed log line (CRF or codec info)");
+
+  // Cleanup
+  fs.rmSync(dir, { recursive: true, force: true });
 });

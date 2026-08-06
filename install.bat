@@ -50,14 +50,17 @@ echo %ESC%[%CYN%m  Target :%ESC%[0m %ESC%[%WHT%m%DEST%%ESC%[0m
 echo.
 
 if not exist "%INSTALL_ROOT%" (
-    echo %ESC%[%RED%m[x]%ESC%[0m ERROR: Resolve's Workflow Integration folder was not found at:
-    echo    %ESC%[%WHT%m%INSTALL_ROOT%%ESC%[0m
-    echo %ESC%[%DIM%m  This is normal if DaVinci Resolve Studio is not installed yet.%ESC%[0m
-    echo %ESC%[%DIM%m  Install DaVinci Resolve Studio ^>= 19.0.2 first, then run%ESC%[0m
-    echo %ESC%[%DIM%m  install.bat again.%ESC%[0m
-    echo.
-    pause
-    exit /b 1
+    echo %ESC%[%YEL%m!WARN!%ESC%[0m Workflow Integration folder not found. Creating it...
+    mkdir "%INSTALL_ROOT%" 2>nul
+    if not exist "%INSTALL_ROOT%" (
+        echo %ESC%[%RED%m[x]%ESC%[0m ERROR: could not create Workflow Integration folder at:
+        echo    %ESC%[%WHT%m%INSTALL_ROOT%%ESC%[0m
+        echo %ESC%[%DIM%m  Run install.bat as Administrator.%ESC%[0m
+        echo.
+        pause
+        exit /b 1
+    )
+    echo %ESC%[%GRN%m[OK]%ESC%[0m Created: %INSTALL_ROOT%
 )
 
 if not exist "%SRC%\manifest.xml" (

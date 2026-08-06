@@ -48,6 +48,23 @@ resolveApiModule.setActiveApi(resolveApi);
 let win = null;
 let activeJob = null; // { running: bool, cancelState: {cancelled, child} }
 
+// GPU detection result, cached so a running job and the panel agree. Refreshed
+// on boot and whenever the user hits "Check again" in Settings.
+let gpuInfo = null;
+function detectGpuCached() {
+  if (gpuInfo === null) gpuInfo = toolsMod.detectGpu();
+  return gpuInfo;
+}
+
+// "auto" and "on" both enable the hardware encoder whenever an NVIDIA GPU is
+// actually present; "off" (or a GPU-less machine) keeps encoding on the CPU.
+function gpuEncodeForJob() {
+  const gpu = detectGpuCached();
+  if (!gpu.available) return false;
+  const mode = settingsMod.load().gpuEncode;
+  return mode === "on" || mode === "auto";
+}
+
 const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function emit(ev) {
@@ -98,7 +115,11 @@ function registerIpc() {
       INSERT_MODES: settingsMod.INSERT_MODES,
       TRIM_METHODS: settingsMod.TRIM_METHODS,
       PRESETS: settingsMod.PRESETS,
+      EFFECTS: settingsMod.EFFECTS,
+      AUDIO_EFFECTS: settingsMod.AUDIO_EFFECTS,
       LANGUAGES: settingsMod.LANGUAGES,
+      GPU_ENCODE_MODES: settingsMod.GPU_ENCODE_MODES,
+      gpu: detectGpuCached(),
       tools: toolsMod.quickCheckAll(),
       resolve_ok: rs.ok,
       resolve_msg: rs.message,
@@ -108,6 +129,7 @@ function registerIpc() {
   ipcMain.handle("grabtify:save-settings", (_e, settings) => {
     const current = settingsMod.load();
     for (const k of Object.keys(settingsMod.DEFAULTS)) {
+      if (k === "effect" || k === "audioEffect") continue; // effects are per-session; never persisted
       if (settings[k] !== undefined) current[k] = settings[k];
     }
     settingsMod.save(current);
@@ -158,6 +180,10 @@ function registerIpc() {
       insert_mode: opts.insert_mode || settingsMod.DEFAULTS.insertMode,
       mode: opts.mode === "audio" ? "audio" : "video",
       audio_quality: opts.audio_quality || settingsMod.DEFAULTS.audioQuality,
+      effect: opts.effect || settingsMod.DEFAULTS.effect,
+      audio_effect: opts.audio_effect || settingsMod.DEFAULTS.audioEffect,
+      gpu_encode: gpuEncodeForJob(),
+      verbose_log: !!opts.verbose_log,
       out_dir: outDir,
     };
 
@@ -222,9 +248,10 @@ function registerIpc() {
 
   ipcMain.handle("grabtify:recheck-resolve", () => {
     useLanguage();
+    gpuInfo = null; // re-run GPU detection too
     const rs = resolveStatus();
     emit({ type: "resolveStatus", ok: rs.ok, message: rs.message });
-    return rs;
+    return { ok: rs.ok, message: rs.message, gpu: detectGpuCached() };
   });
 
   ipcMain.handle("grabtify:open-external", async (_e, url) => {
@@ -279,6 +306,14 @@ function registerIpc() {
     settingsMod.save(s);
     return { ok: true };
   });
+
+  ipcMain.handle("window-minimize", () => {
+    if (win) win.minimize();
+  });
+
+  ipcMain.handle("window-close", () => {
+    if (win) win.close();
+  });
 }
 
 function createWindow() {
@@ -291,7 +326,8 @@ function createWindow() {
     resizable: false,
     maximizable: false,
     fullscreenable: false,
-    backgroundColor: "#f2ecdd",
+    frame: false,
+    backgroundColor: "silver",
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -299,11 +335,11 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: false,
-      zoomFactor: 0.9,
+      zoomFactor: 1,
     },
   });
   win.setMenuBarVisibility(false);
-  win.webContents.setZoomFactor(0.9);
+  win.webContents.setZoomFactor(1);
   win.loadFile(path.join(__dirname, "index.html"));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);

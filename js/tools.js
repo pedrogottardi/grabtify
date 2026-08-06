@@ -109,6 +109,66 @@ function mediaDuration(filePath) {
   }
 }
 
+// Detects whether the machine can hardware-encode with NVIDIA NVENC. The GPU
+// must actually be present (nvidia-smi reports it) AND the bundled ffmpeg must
+// ship the h264_nvenc encoder. Never throws; slow paths get short timeouts.
+function detectGpu() {
+  let label = "";
+  try {
+    const out = spawnSync("nvidia-smi", ["-L"], {
+      encoding: "utf-8",
+      windowsHide: true,
+      timeout: 8000,
+    });
+    if (out.status === 0) {
+      const text = (out.stdout || "").trim();
+      const m = /GPU \d+: (.+?) \(UUID:/.exec(text);
+      if (m) label = m[1].trim();
+    }
+  } catch (e) {
+    // no nvidia-smi on PATH — no NVIDIA GPU
+  }
+
+  let encoder = "";
+  try {
+    const ffmpeg = resolveTool("ffmpeg");
+    const out = spawnSync(ffmpeg.cmd, ["-hide_banner", "-encoders"], {
+      encoding: "utf-8",
+      windowsHide: true,
+      timeout: 15000,
+    });
+    const text = (out.stdout || "") + (out.stderr || "");
+    if (/\bh264_nvenc\b/.test(text)) encoder = "h264_nvenc";
+  } catch (e) {
+    // ffmpeg unavailable — GPU path can't run
+  }
+
+  const available = !!label && !!encoder;
+  return { available: available, label: label, encoder: encoder };
+}
+
+// True when the file has at least one audio stream. Used by the VHS effect,
+// which only wires the lo-fi audio filters when there is something to filter.
+function mediaHasAudio(filePath) {
+  const ffprobe = resolveTool("ffprobe");
+  try {
+    const out = spawnSync(
+      ffprobe.cmd,
+      [
+        "-v", "error",
+        "-select_streams", "a",
+        "-show_entries", "stream=index",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        filePath,
+      ],
+      { encoding: "utf-8", windowsHide: true, timeout: 15000 }
+    );
+    return /^\d/.test((out.stdout || "").trim());
+  } catch (e) {
+    return false;
+  }
+}
+
 // True when the file can go straight into a Resolve timeline: H.264 video with
 // AAC/MP3 audio (the codecs yt-dlp prefers for MP4). VP9/AV1/HEVC and odd
 // audio codecs come back false so automatic encoding can normalize them. A
@@ -375,7 +435,9 @@ module.exports = {
   checkTool,
   quickCheckAll,
   mediaDuration,
+  mediaHasAudio,
   isResolveReady,
+  detectGpu,
   JobCancelled,
   runTool,
   cancel,

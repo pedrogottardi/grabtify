@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld("grabtify", {
   updateTools: (ids) => ipcRenderer.invoke("grabtify:update-tools", ids),
   snoozeUpdates: () => ipcRenderer.invoke("grabtify:snooze-updates"),
   openExternal: (url) => ipcRenderer.invoke("grabtify:open-external", url),
+  minimize: () => ipcRenderer.invoke("window-minimize"),
+  close: () => ipcRenderer.invoke("window-close"),
   onEvent: (callback) => {
     if (typeof callback === "function") eventListeners.push(callback);
   },

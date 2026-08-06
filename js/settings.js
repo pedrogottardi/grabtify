@@ -21,6 +21,10 @@ const DEFAULTS = {
   outDir: "",
   convert: false,
   autoEncode: true,
+  effect: "off",
+  audioEffect: "off",
+  gpuEncode: "auto",
+  verboseLog: false,
   language: "en",
   updateCheckAt: 0,
   updateSnoozeUntil: 0,
@@ -64,9 +68,50 @@ const TRIM_METHODS = [
   ["ffmpeg", "opt.ffmpegTrim"],
 ];
 
+// Experimental video effects. Each forces the re-encode stage (app.js turns
+// convert on) and maps to an ffmpeg filter chain in pipeline.js effectArgs().
+const EFFECTS = [
+  ["off", "fx.off"],
+  ["smear", "fx.smear"],
+  ["mosh", "fx.mosh"],
+  ["glitch", "fx.glitch"],
+  ["vhs", "fx.vhs"],
+  ["pixel", "fx.pixel"],
+  ["tiny240", "fx.tiny240"],
+  ["poster", "fx.poster"],
+  ["noir", "fx.noir"],
+  ["crt", "fx.crt"],
+  ["trail", "fx.trail"],
+];
+
+// Audio effects. Each forces the re-encode stage (app.js) and maps to an
+// ffmpeg -af chain in pipeline.js audioEffectArgs(). They apply in both video
+// (MP4) and audio (MP3) modes.
+const AUDIO_EFFECTS = [
+  ["off", "af.off"],
+  ["echo", "af.echo"],
+  ["reverb", "af.reverb"],
+  ["radio", "af.radio"],
+  ["nightcore", "af.nightcore"],
+  ["deep", "af.deep"],
+  ["bass", "af.bass"],
+  ["tremolo", "af.tremolo"],
+  ["crush", "af.crush"],
+  ["reverse", "af.reverse"],
+];
+
 const LANGUAGES = [
   ["en", "lang.en"],
   ["pt-BR", "lang.ptBR"],
+];
+
+// NVIDIA GPU encoding. "auto" uses the hardware encoder only when the GPU is
+// detected; "on" forces it (falling back to CPU if unavailable); "off" always
+// encodes on the CPU. Persisted normally (not session-only).
+const GPU_ENCODE_MODES = [
+  ["auto", "gpu.auto"],
+  ["on", "gpu.on"],
+  ["off", "gpu.off"],
 ];
 
 function defaultOutDir() {
@@ -103,6 +148,7 @@ function load() {
   }
   if (!out.outDir) out.outDir = defaultOutDir();
   if (typeof out.autoEncode !== "boolean") out.autoEncode = true;
+  if (typeof out.verboseLog !== "boolean") out.verboseLog = false;
   if (!LANGUAGES.some((l) => l[0] === out.language)) out.language = DEFAULTS.language;
   // Guard against stale values saved by older versions (old HandBrake preset
   // names, etc.) so the panel never shows an empty dropdown.
@@ -112,6 +158,13 @@ function load() {
   if (!PRESETS.some((p) => p[0] === out.preset)) out.preset = DEFAULTS.preset;
   if (!INSERT_MODES.some((m) => m[0] === out.insertMode)) out.insertMode = DEFAULTS.insertMode;
   if (!TRIM_METHODS.some((t) => t[0] === out.trimMethod)) out.trimMethod = DEFAULTS.trimMethod;
+  if (!GPU_ENCODE_MODES.some((g) => g[0] === out.gpuEncode)) out.gpuEncode = DEFAULTS.gpuEncode;
+  // The video effect is a per-session choice: it never comes back from disk,
+  // so the panel always boots with "off" (the renderer keeps the live value
+  // only in memory for the current job).
+  out.effect = DEFAULTS.effect;
+  // The audio effect is per-session too, same rationale as the video effect.
+  out.audioEffect = DEFAULTS.audioEffect;
   return out;
 }
 
@@ -131,7 +184,10 @@ module.exports = {
   MODES,
   INSERT_MODES,
   TRIM_METHODS,
+  EFFECTS,
+  AUDIO_EFFECTS,
   LANGUAGES,
+  GPU_ENCODE_MODES,
   defaultOutDir,
   settingsPath,
   load,

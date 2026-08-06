@@ -1,48 +1,110 @@
-/* Grabtify — neobrutalist skin for DaVinci Resolve.
- * Cream page, near-black ink, teal accent. Square corners, 2px ink borders,
- * 4px hard shadows, all-monospace and chunky. State is expressed as solid
- * fills and hard offsets, never as glow or soft radius.
+/* Grabtify — Windows 98 skin (layer over vendored 98.css).
+ *
+ * The whole panel is one 98 program window floating on a neutral-gray
+ * desktop. Grabtify's own state vocabulary (stage tokens, rig rows, update
+ * rows, block progress) keeps its class names and is RESTYLED here with 98
+ * beveled semantics — pressed/sunken for active, disabled/dimmed for done,
+ * red text for errors, navy for emphasis. No brand accent: stock Win98 chrome.
  */
 
 :root {
-  --bg:        #f2ecdd;
-  --surface:   #fffdf2;
-  --surface-2: #e9e2cd;
-  --ink:       #111111;
-  --ink-soft:  #44403a;
-  --faint:     #8b8577;
-  --accent:    #00d4ff;
-  --accent-2:  #0099bb;
-  --bad:       #ff3b3b;
-  --good:      #111111;
-  --line:      #111111;
-  --mono: "JetBrains Mono", "IBM Plex Mono", "Roboto Mono",
-          Menlo, Consolas, "Courier New", monospace;
-  --ctl-h: 34px;
-  --ctl-h-sm: 25px;
-  --fs-label: 11px;
-  --fs-input: 14px;
-  --fs-btn: 14px;
-  --fs-btn-sm: 11px;
-  --fs-primary: 15px;
+  --desktop:   #7b7b7b;
+  --face:      silver;
+  --field:     #ffffff;
+  --ink:       #000000;
+  --text-soft: #404040;
+  --highlight: #000080;
+  --err:       #cc0000;
+  --warn-bg:   #ffffcc;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+/* The pixel font (defined in vendored 98.css) is the 98.css "Pixelated MS
+ * Sans Serif" redraw, extended with the accented Latin-1 glyphs (ã, ç, á...)
+ * from MSW98UI (martyr.shop — a conversion of the original MS Sans Serif
+ * raster font, credits to Microsoft / Lev Leontev / martyr). */
+
 html, body { height: 100%; }
+
 body {
   display: flex;
-  flex-direction: column;
+  align-items: stretch;
   margin: 0;
-  padding: 10px 12px 12px;
-  background: var(--bg);
-  color: var(--ink);
-  font: 14px/1.5 var(--mono);
-  letter-spacing: .02em;
+  padding: 0;
+  background: var(--face);
+  color: #222;
+  font-family: "Pixelated MS Sans Serif", Tahoma, "MS Sans Serif", Arial, sans-serif;
+  font-size: 11px;
   overflow-x: hidden;
+  cursor: url("../cursor/cursor.cur"), auto;
 }
-::selection { background: var(--accent); color: var(--ink); }
+
+/* Accented letters (pt-BR) now come from the pixel font itself, so no
+ * fallback override is needed for the .lang-pt state. */
+
+::selection { background: var(--highlight); color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+@keyframes blink { 50% { opacity: .35; } }
+@keyframes dotty { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+
+/* --------------------------------------------------------- custom cursors ---
+ * Win98 cursor set from cursor/. Native keywords stay as CSS fallbacks. The
+ * draggable titlebar keeps the OS cursor (app-region: drag ignores CSS).
+ * *{cursor:inherit} forces the url() cursor down every element — Chromium
+ * otherwise fails to apply url() cursors through plain inheritance. */
+a { cursor: url("../cursor/pointer.cur"), pointer; }
+button { cursor: url("../cursor/pointer.cur"), pointer; }
+select { cursor: url("../cursor/cursor.cur"), default; }
+option { cursor: url("../cursor/pointer.cur"), pointer; }
+input[type="checkbox"],
+input[type="radio"] { cursor: url("../cursor/cursor.cur"), default; }
+input[type="checkbox"] + label,
+input[type="radio"] + label { cursor: url("../cursor/cursor.cur"), default; }
+input[type="text"],
+input[type="url"],
+input[type="password"],
+textarea { cursor: text; }
+* { cursor: inherit; }
+
+/* While a job runs, every element shows the loading cursor (overrides the
+ * pointer/help/text rules above by specificity; the draggable titlebar still
+ * keeps the OS cursor). */
+body.busy,
+body.busy * { cursor: url("../cursor/loading.cur"), wait; }
+
+/* -------------------------------------------------------------- app window --- */
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.app-main > .window-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 6px 8px 8px;
+  overflow-y: auto;
+}
+.status-bar { margin-top: 0; }
+.ver-field { flex: 0 0 auto; min-width: 92px; text-align: center; }
+
+/* --------------------------------------------------------- frameless titlebar --- */
+.app-main > .title-bar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.title-bar-controls {
+  -webkit-app-region: no-drag;
+}
 
 /* ------------------------------------------------------------- boot screen --- */
 .boot {
@@ -52,116 +114,26 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: transparent;
 }
-.boot-inner {
+.boot,
+.boot * { cursor: url("../cursor/loading.cur"), wait; }
+.boot-win { width: 250px; }
+.boot-win .window-body {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 4px 4px 0 0 var(--ink);
-  padding: 28px 40px;
+  justify-content: center;
 }
-.boot-mark {
-  width: 28px; height: 28px;
-  background: var(--accent);
-  border: 2px solid var(--ink);
-  box-shadow: 2px 2px 0 0 var(--ink);
-}
-.boot-word {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: .22em;
-  white-space: nowrap;
-}
-.boot-status {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--faint);
-  animation: blink 1s steps(2, start) infinite;
-}
+.boot-status { margin: 0; font-weight: 700; }
 
-/* ------------------------------------------------------------- header --- */
-.top {
-  padding: 0 0 8px;
-  border-bottom: 2px solid var(--ink);
-  margin-bottom: 10px;
-}
-.top-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 36px;
-}
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.mark {
-  width: 20px; height: 20px; flex: none;
-  background: var(--accent);
-  border: 2px solid var(--ink);
-  box-shadow: 2px 2px 0 0 var(--ink);
-}
-.wordmark {
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: .18em;
-  white-space: nowrap;
-}
-.top-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.token {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  white-space: nowrap;
-  padding: 3px 5px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  cursor: help;
-  transition: transform .06s, box-shadow .06s;
-}
-.token.wait { color: var(--faint); }
-.token.ok  { background: var(--surface); }
-.token.bad {
-  background: var(--bad);
-  color: #fff;
-  box-shadow: 2px 2px 0 0 var(--ink);
-}
-.icon-btn {
-  width: 32px; height: 32px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--surface);
-  color: var(--ink);
-  border: 2px solid var(--ink);
-  box-shadow: 2px 2px 0 0 var(--ink);
-  cursor: pointer;
-  padding: 0;
-  transition: transform .06s, box-shadow .06s;
-}
-.icon-btn svg { width: 17px; height: 17px; }
-.icon-btn:hover { background: var(--accent); }
-.icon-btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 0 var(--ink);
-}
-.icon-btn.active { background: var(--accent); }
-.icon-btn:focus-visible, .token:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-
-/* -------------------------------------------------- stage strip / status --- */
-.status { margin-bottom: 8px; }
+/* ------------------------------------------------------------ stage strip ---
+ * The three pipeline stages as small toolbar tokens. Idle = disabled/grey,
+ * active = enabled (raised + navy), done = dimmed, error = red. */
 .stage-strip {
   list-style: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
   margin: 0 0 6px;
   padding: 0;
   flex-wrap: wrap;
@@ -170,110 +142,185 @@ body {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  padding: 4px 8px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
+  padding: 2px 8px;
+  background: var(--face);
+  box-shadow: inset -1px -1px #fff, inset 1px 1px grey;
   font-weight: 700;
-  letter-spacing: .08em;
   white-space: nowrap;
+  color: grey;
 }
-.stage-tok .num { font-size: 11px; color: var(--faint); }
-.stage-tok .name { font-size: 13px; }
-.sep {
-  color: var(--faint);
-  font-weight: 700;
-  font-size: 16px;
-  line-height: 1;
-}
-.stage-tok.done { background: var(--ink); color: var(--surface); }
-.stage-tok.done .num { color: var(--accent); }
+.stage-tok .name { color: grey; }
+.stage-tok .num { font-size: 10px; color: grey; }
 .stage-tok.active {
-  background: var(--accent);
-  color: var(--ink);
-  box-shadow: 2px 2px 0 0 var(--ink);
-  transform: translate(-1px, -1px);
+  box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #fff,
+              inset -2px -2px grey, inset 2px 2px #dfdfdf;
+  color: #000;
 }
-.stage-tok.active .num { color: var(--ink); }
-.stage-tok.skip { opacity: .45; border-style: dashed; }
-.stage-tok.error { background: var(--bad); color: #fff; }
-.stage-tok.error .num { color: #fff; }
+.stage-tok.active .name { color: var(--highlight); }
+.stage-tok.active .num { color: var(--highlight); }
+.stage-tok.done { opacity: .55; }
+.stage-tok.done .name { color: #555; }
+.stage-tok.error { box-shadow: none; background: var(--face); }
+.stage-tok.error .name,
+.stage-tok.error .num { color: var(--err); font-weight: 700; }
+.sep { color: #555; font-size: 13px; line-height: 1; }
 
-.status-line {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  min-height: 20px;
-  word-break: break-word;
+/* --------------------------------------------------------- tabs + tabpanel --- */
+.tabpanel {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: visible;
+  margin-top: 0;
 }
-.status-line .stg { color: var(--accent-2); }
-.status-line .bar-blocks { color: var(--ink); letter-spacing: 1px; }
-.status-line.indet .bar-blocks { animation: blink 1s steps(2, start) infinite; }
+#mainView {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+#settingsView { overflow-y: auto; }
+#aboutView { overflow-y: auto; }
+.tabpanel .window-body {
+  margin: 8px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* --------------------------------------------------------------- status line ---
+ * Lives inside a status-bar-field; keeps the inline progress bar. */
+.status-line { font-size: 11px; min-height: 15px; }
+.status-line .stg { color: var(--highlight); font-weight: 700; }
+.status-line .prog-track {
+  display: inline-block;
+  width: 80px;
+  height: 12px;
+  vertical-align: middle;
+  margin: 0 4px;
+  padding: 2px;
+  box-shadow: inset -1px -1px #dfdfdf, inset 1px 1px grey;
+  background: #fff;
+}
+.status-line .prog-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--highlight);
+  transition: width 0.3s ease;
+}
 .status-line .dots { display: inline-block; }
 .status-line .dots span { animation: dotty 1.1s infinite; }
 .status-line .dots span:nth-child(1) { animation-delay: 0s; }
 .status-line .dots span:nth-child(2) { animation-delay: .18s; }
 .status-line .dots span:nth-child(3) { animation-delay: .36s; }
-.status-line.err { color: var(--bad); }
-@keyframes blink { 50% { opacity: .35; } }
-@keyframes dotty { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+.status-line.err { color: var(--err); }
 
-/* ------------------------------------------------------- cards / form --- */
-.card {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 3px 3px 0 0 var(--ink);
-  padding: 10px;
-  margin-bottom: 10px;
+/* -------------------------------------------------------------- form fields --- */
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  margin-bottom: 6px;
 }
-.section-title {
+.field .flabel {
+  display: block;
+  margin-bottom: 2px;
+  font-family: "Pixelated MS Sans Serif", Tahoma, "MS Sans Serif", Arial, sans-serif;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+}
+.flabel em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--text-soft);
+  font-family: Arial, sans-serif;
+}
+.field input[type="text"],
+.field select {
+  width: 100%;
+}
+input.tc { text-align: center; }
+input.invalid,
+select.invalid {
+  outline: 2px solid var(--err);
+  outline-offset: 0;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.row .field { flex: 1 1 90px; }
+.row .field.grow { flex: 2 1 140px; }
+.mode-field { flex: 0 0 130px; }
+.row > .btn { margin-bottom: 6px; flex: none; }
+
+/* -------------------------------------------------------------- trim drawer --- */
+.trim { margin-bottom: 4px; }
+.trim-summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: url("../cursor/pointer.cur"), pointer;
+  user-select: none;
+  font-weight: 700;
+}
+.trim-summary::-webkit-details-marker { display: none; }
+.trim-summary::before {
+  content: "+";
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 1px solid grey;
+  background: #fff;
+  text-align: center;
+  line-height: 8px;
+  font-weight: 700;
+}
+.trim[open] .trim-summary::before { content: "-"; }
+.trim-panel {
+  margin-top: 6px;
+  padding-left: 14px;
+}
+
+/* ------------------------------------------------------------------ notice --- */
+.notice {
   margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .26em;
-  text-transform: uppercase;
-  border-left: 4px solid var(--accent-2);
-  padding-left: 8px;
+  padding: 6px 8px;
+  border: 1px solid #000;
+  background: var(--warn-bg);
+  font-size: 11px;
 }
 
-.field { display: block; margin-bottom: 8px; min-width: 0; }
-.row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
-.row .field { flex: 1 1 90px; margin-bottom: 8px; }
-.row .field.grow { flex: 2 1 120px; }
-.mode-field { flex: 0 0 132px; min-width: 0; }
-.row > .btn { flex: none; margin-bottom: 8px; }
-
-.card.settings {
-  padding: 8px;
-  overflow-y: auto;
-  max-height: 100%;
+/* ----------------------------------------------------------------- actions --- */
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
 }
-.card.settings .section-title { margin-bottom: 6px; }
-.card.settings .row .field { margin-bottom: 4px; }
-.card.settings .row > .btn { margin-bottom: 4px; }
-.card.settings .chip-row .btn { margin-bottom: 0; }
-.card.settings .checks { margin-bottom: 4px; }
-.card.settings .check { margin: 4px 0; }
-.card.settings .check-note { margin-bottom: 2px; }
+.actions .btn.default { flex: 1 1 auto; }
+.btn-sm { min-width: 0; min-height: 20px; padding: 0 8px; }
 
-/* ------------------------------------------------- settings blocks ---
- * Settings reads as a control panel: each themed group is its own
- * bordered block, separated by a dashed hairline. */
-.set-block {
-  border-bottom: 2px dashed var(--faint);
-  padding: 2px 0 10px;
-  margin-bottom: 8px;
+/* ------------------------------------------------------------------- checks --- */
+.checks { margin: 4px 0 0; }
+.checks .field-row { margin: 4px 0; }
+.check-note {
+  margin: 2px 0 0 32px;
+  color: var(--text-soft);
+  font-size: 10px;
+  font-family: Arial, sans-serif;
 }
-.set-block:last-of-type {
-  border-bottom: none;
-  padding-bottom: 2px;
-  margin-bottom: 4px;
-}
+/* The GPU acceleration field starts a new setting group below the encode
+ * checkboxes. With auto-encode on the "Always encode" checkbox is hidden, so
+ * without this margin the note above would sit flush against the label. */
+.gpu-row { margin-top: 12px; }
 
-/* --------------------------------------------------- rig / system check ---
- * The signature: an equipment manifest. Each row is one rig unit with a
- * solid state glyph, the tool name, what it does, and a status word.
- * Ready = ink block + check, missing = red fill, checking = blinking. */
+/* -------------------------------------------------------------- rig / system --- */
 .rig-list {
   list-style: none;
   margin: 0 0 6px;
@@ -283,100 +330,67 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 6px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  margin-bottom: 4px;
-  cursor: help;
+  padding: 3px 4px;
+  margin-bottom: 3px;
+  background: var(--field);
+  box-shadow: inset -1px -1px #fff, inset 1px 1px grey,
+              inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a;
+  cursor: url("../cursor/question.cur"), help;
 }
 .rig-row:last-child { margin-bottom: 0; }
 .rig-glyph {
-  width: 15px; height: 15px;
+  width: 15px;
+  height: 15px;
   flex: none;
-  border: 2px solid var(--ink);
-  background: var(--surface);
+  background: #fff;
+  box-shadow: inset -1px -1px #fff, inset 1px 1px grey,
+              inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a;
   position: relative;
 }
-.rig-glyph::after {
+.rig-row.ok .rig-glyph::after {
   content: "";
   position: absolute;
-  left: 2px; top: 0;
+  left: 3px; top: 1px;
   width: 6px; height: 9px;
-  border: solid var(--surface);
+  border: solid #000;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
-  opacity: 0;
 }
-.rig-row.ok { background: var(--ink); }
-.rig-row.ok .rig-glyph { background: var(--accent); box-shadow: 2px 2px 0 0 var(--surface); }
-.rig-row.ok .rig-glyph::after { opacity: 1; border-color: var(--ink); }
-.rig-row.ok .rig-name { color: var(--surface); }
-.rig-row.ok .rig-state { color: var(--accent); }
-.rig-row.bad { background: var(--bad); }
-.rig-row.bad .rig-glyph { background: var(--surface); }
 .rig-row.bad .rig-glyph::after {
-  opacity: 1;
-  border: none;
-  background: var(--bad);
-  width: 11px; height: 3px;
-  left: 0; top: 5px;
-  transform: none;
+  content: "X";
+  position: absolute;
+  left: 2px; top: -1px;
+  color: var(--err);
+  font-size: 12px;
+  font-weight: 700;
 }
+.rig-row.wait .rig-glyph { animation: blink 1s steps(2, start) infinite; }
 .rig-row.bad .rig-name,
-.rig-row.bad .rig-state { color: #fff; }
-.rig-row.wait .rig-glyph { background: var(--accent); animation: blink 1s steps(2, start) infinite; }
-.rig-row:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.rig-name {
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: .04em;
-  white-space: nowrap;
-}
+.rig-row.bad .rig-state { color: var(--err); }
+.rig-name { font-weight: 700; white-space: nowrap; }
 .rig-role {
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--faint);
+  color: var(--text-soft);
   white-space: nowrap;
+  font-family: Arial, sans-serif;
 }
-.rig-row.ok .rig-role { color: var(--surface-2); }
 .rig-state {
   margin-left: auto;
   flex: none;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--faint);
+  font-size: 10px;
+  font-family: Arial, sans-serif;
 }
-.rig-row.wait .rig-state { color: var(--faint); }
 .rig-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 2px 0;
-  border-top: 2px dashed var(--faint);
+  padding-top: 6px;
 }
-.rig-btns {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-}
-.rig-summary {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
+.rig-btns { display: flex; align-items: center; gap: 6px; flex: none; }
+.rig-summary { font-size: 10px; font-family: Arial, sans-serif; }
 
-/* --------------------------------------------------- update modal ---
- * Reuses the boot-screen vocabulary: an ink-bordered card floating over a
- * dimmed page. Each outdated tool is one row: name, installed → latest,
- * and a live state word while an update runs. */
+/* ------------------------------------------------------------ updates modal --- */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -384,377 +398,197 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(17, 17, 17, .55);
+  background: rgba(0, 0, 0, .45);
 }
 .modal-card {
-  width: min(480px, calc(100vw - 40px));
-  max-height: calc(100vh - 60px);
-  overflow-y: auto;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 6px 6px 0 0 var(--ink);
-  padding: 18px 20px;
+  width: min(440px, calc(100vw - 48px));
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
 }
-.modal-title {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  border-left: 4px solid var(--accent-2);
-  padding-left: 8px;
-}
-.modal-sub {
-  margin: 0 0 10px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .03em;
+.modal-card .window-body { overflow-y: auto; }
+.modal-sub { margin: 2px 0 8px; }
+.modal-note {
+  margin: 8px 0;
+  font-size: 10px;
+  color: var(--text-soft);
+  /* Small auxiliary text follows the app convention (Arial at 10px, same as
+     .check-note / .flabel em / .rig-summary / .legal-note) so the pixel font,
+     which only renders crisply at 11px, never gets scaled down. */
+  font-family: Arial, sans-serif;
 }
 .upd-list {
   list-style: none;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   padding: 0;
 }
 .upd-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  margin-bottom: 4px;
+  padding: 4px 6px;
+  margin-bottom: 3px;
+  background: var(--field);
+  box-shadow: inset -1px -1px #fff, inset 1px 1px grey,
+              inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a;
 }
 .upd-row:last-child { margin-bottom: 0; }
-.upd-name {
-  font-weight: 800;
-  font-size: 13px;
-  white-space: nowrap;
-}
+.upd-name { font-weight: 700; white-space: nowrap; }
 .upd-vers {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ink-soft);
+  font-size: 10px;
+  color: var(--text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: Arial, sans-serif;
 }
 .upd-row.outdated .upd-vers {
-  background: var(--accent);
-  border: 1px solid var(--ink);
-  padding: 1px 4px;
+  background: var(--highlight);
+  color: #fff;
+  padding: 0 3px;
 }
 .upd-state {
   margin-left: auto;
   flex: none;
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--faint);
+  font-family: Arial, sans-serif;
 }
-.upd-state.downloading { color: var(--accent-2); }
-.upd-state.done { color: var(--good); }
-.upd-state.failed { color: var(--bad); }
-.modal-note {
-  margin: 0 0 12px;
-  font-size: 10px;
-  letter-spacing: .03em;
-  color: var(--faint);
-}
+.upd-state.downloading { color: var(--highlight); }
+.upd-state.done { color: #000; }
+.upd-state.failed { color: var(--err); }
 .modal-actions {
   display: flex;
   gap: 8px;
-  align-items: center;
-}
-.modal-actions .btn { flex: 1 1 auto; }
-
-/* --------------------------------------------------- legal note (settings) ---
- * The DRM disclaimer moved out of the footer into the Settings card, kept
- * as a quiet footnote so it informs without shouting. */
-.legal-note {
-  margin: 2px 0 0;
-  font-size: 9.5px;
-  letter-spacing: .04em;
-  line-height: 1.5;
-  color: var(--faint);
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
-.label {
-  display: block;
-  font-size: var(--fs-label);
-  font-weight: 700;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  margin-bottom: 3px;
-}
-.label em {
-  font-style: normal;
-  font-weight: 400;
-  font-size: 10px;
-  letter-spacing: .05em;
-  text-transform: lowercase;
-  color: var(--faint);
-  margin-left: 4px;
-}
-
-input[type="text"], select {
-  width: 100%;
-  height: var(--ctl-h);
-  background: var(--surface);
-  color: var(--ink);
-  border: 2px solid var(--ink);
-  border-radius: 0;
-  padding: 0 8px;
-  font: 700 var(--fs-input)/1.3 var(--mono);
-  letter-spacing: .02em;
-  outline: none;
-  transition: box-shadow .08s;
-}
-input[type="text"]::placeholder { color: var(--faint); font-weight: 400; }
-input[type="text"]:focus, select:focus {
-  box-shadow: 2px 2px 0 0 var(--ink);
-  outline: none;
-}
-input[type="text"].invalid, select.invalid {
-  border-color: var(--bad);
-  background: #ffe9e7;
-  box-shadow: 2px 2px 0 0 var(--bad);
-}
-input.tc { text-align: center; }
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding-right: 30px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='6'><path d='M0 0h9L4.5 6z' fill='%23111111'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 11px center;
-  cursor: pointer;
-}
-select option { background: var(--surface); color: var(--ink); }
-select:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
-
-.notice {
-  margin: 0 0 10px;
-  padding: 7px 9px;
-  border: 2px solid var(--accent-2);
-  background: #d9f6ff;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .04em;
-}
-
-/* ------------------------------------------------------- trim drawer ---
- * Cutting the clip is a secondary decision, so in/out points live in a
- * collapsible drawer below the quality/insert row. Collapsed by default. */
-.trim { margin-bottom: 8px; }
-.trim-summary {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-  font-size: var(--fs-label);
-  font-weight: 700;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-}
-.trim-summary::-webkit-details-marker { display: none; }
-.trim-summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.trim-summary .caret {
-  display: inline-block;
-  transition: transform .12s;
-}
-.trim[open] .trim-summary .caret { transform: rotate(180deg); }
-.trim-panel {
-  margin-top: 6px;
-  padding-top: 8px;
-  border-top: 2px dashed var(--faint);
-}
-
-.checks { margin: 0 0 8px; }
-.check-note {
-  margin: 0 0 4px 29px;
-  font-size: 10.5px;
-  letter-spacing: .03em;
-  color: var(--faint);
-}
-.check {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin: 8px 0;
-  cursor: pointer;
-  font-weight: 700;
-  letter-spacing: .06em;
-}
-.check input {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 19px; height: 19px;
-  flex: none;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  cursor: pointer;
-  position: relative;
-  transition: box-shadow .08s;
-}
-.check input:checked {
-  background: var(--accent);
-  box-shadow: 2px 2px 0 0 var(--ink);
-}
-.check input:checked::after {
-  content: "";
-  position: absolute;
-  left: 3px; top: 0;
-  width: 8px; height: 12px;
-  border: solid var(--ink);
-  border-width: 0 3px 3px 0;
-  transform: rotate(45deg);
-}
-.check input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-
-/* ------------------------------------------------------------ buttons --- */
-.actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-top: 2px;
-}
-.btn {
-  height: var(--ctl-h);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font: 800 var(--fs-btn)/1 var(--mono);
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  border: 2px solid var(--ink);
-  border-radius: 0;
-  padding: 0 11px;
-  cursor: pointer;
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 3px 3px 0 0 var(--ink);
-  transition: transform .06s, box-shadow .06s;
-}
-.btn:hover { background: var(--surface-2); }
-.btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 0 var(--ink);
-}
-.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.btn.primary {
+/* -------------------------------------------------------------- job log --- */
+.console-panel {
   flex: 1 1 auto;
-  background: var(--accent);
-  font-size: var(--fs-primary);
-  letter-spacing: .2em;
-  box-shadow: 4px 4px 0 0 var(--ink);
-}
-.btn.primary:active { box-shadow: 2px 2px 0 0 var(--ink); }
-.btn.primary:hover { background: var(--accent-2); color: #fff; }
-.btn.primary:disabled { opacity: .35; cursor: default; box-shadow: 2px 2px 0 0 var(--ink); }
-.btn.danger { background: var(--bad); color: #fff; }
-.btn.danger:hover { background: #ff5a5a; }
-.btn.ghost { box-shadow: none; }
-.btn.ghost:hover { background: var(--surface-2); }
-.btn.ghost:active { transform: translate(0, 0); box-shadow: none; }
-.btn-sm { height: var(--ctl-h-sm); font-size: var(--fs-btn-sm); padding: 0 9px; }
-.btn:disabled { opacity: .35; cursor: default; }
-
-.chip-row { align-items: center; }
-
-/* ------------------------------------------------------------- console --- */
-.console {
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  box-shadow: 3px 3px 0 0 var(--ink);
-  margin: 0;
-  flex: 1 1 auto;
-  min-height: 0;
+  min-height: 60px;
   display: flex;
   flex-direction: column;
+  margin-top: 8px;
 }
 .console-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
-  border-bottom: 2px solid var(--ink);
-  background: var(--surface-2);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .24em;
-  text-transform: uppercase;
+  margin-bottom: 2px;
+  font-weight: 700;
 }
-.dot { width: 10px; height: 10px; border: 2px solid var(--ink); flex: none; }
-.dot.r { background: var(--bad); }
-.dot.y { background: var(--accent); }
-.dot.g { background: var(--good); }
+.log-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  padding: 0;
+}
 .log {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 8px 10px;
+  padding: 4px 6px;
   font-size: 11px;
-  line-height: 1.6;
-  color: var(--ink);
-  background: var(--surface);
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }
-.log .note { color: var(--accent-2); font-weight: 700; }
-.log .ok   { color: var(--good); font-weight: 700; }
-.log .err  { color: var(--bad); font-weight: 700; }
-.log .cmd  { color: var(--accent-2); opacity: .85; }
-.log::-webkit-scrollbar { width: 10px; }
-.log::-webkit-scrollbar-thumb { background: var(--ink); border: 2px solid var(--surface); }
-.log::-webkit-scrollbar-track { background: var(--surface-2); }
+.log .note { color: var(--highlight); font-weight: 700; }
+.log .ok   { color: #000; font-weight: 700; }
+.log .err  { color: var(--err); font-weight: 700; }
+.log .cmd  { color: var(--text-soft); }
 
-/* -------------------------------------------------------------- footer --- */
-.legal {
+/* ---------------------------------------------------------- about / footer --- */
+.about-header {
+  display: block;
+  width: 55%;
+  height: auto;
+  margin: 12px auto 0;
+}
+.about-desc {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.about-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 10px 2px 0;
-  padding-top: 8px;
-  border-top: 2px solid var(--ink);
+  align-items: baseline;
+  gap: 10px;
+  padding: 1px 0;
 }
-.ver {
+.about-key {
+  flex: 0 0 90px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+.about-value { color: #222; }
+.creator-link { color: #0000ff; }
+.legal-note {
+  margin: 8px 0 0;
+  font-size: 10px;
+  color: var(--text-soft);
+  line-height: 1.4;
+  font-family: Arial, sans-serif;
+}
+.kofi-link {
   display: inline-block;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  color: var(--ink);
-  padding: 2px 9px;
-  font-size: 11px;
-  letter-spacing: .14em;
-  font-weight: 800;
-  box-shadow: 2px 2px 0 0 var(--ink);
-  white-space: nowrap;
-}
-.coffee {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .08em;
+  margin-top: 8px;
+  background: var(--face);
+  box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #fff,
+              inset -2px -2px grey, inset 2px 2px #dfdfdf;
+  padding: 3px 12px;
   text-decoration: none;
-  border: 2px solid var(--ink);
-  background: var(--surface);
-  padding: 3px 9px;
-  box-shadow: 2px 2px 0 0 var(--ink);
-  white-space: nowrap;
-  cursor: pointer;
+  color: #000;
+  font-weight: 700;
 }
-.coffee:hover { background: var(--accent); }
-.coffee:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 0 var(--ink); }
-.coffee:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.kofi-link:active {
+  box-shadow: inset -1px -1px #fff, inset 1px 1px #0a0a0a,
+              inset -2px -2px #dfdfdf, inset 2px 2px grey;
+}
 
-/* -------------------------------------------------- mode visibility --- */
+/* ---------------------------------------------------------- mode visibility --- */
 body.mode-audio .video-only { display: none !important; }
 body.mode-video .audio-only { display: none !important; }
 
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-  .status-line.indet .bar-blocks { animation: none; opacity: .6; }
+/* --------------------------------------------------- custom select (Win98) --- */
+/* Options list — drops down below the native <select>. */
+.cs-options {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--field);
+  box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #fff,
+              inset -2px -2px grey, inset 2px 2px #dfdfdf;
+  margin-top: -1px;
+  cursor: url("../cursor/cursor.cur"), default;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+}
+
+/* Individual option. */
+.cs-option {
+  padding: 2px 4px;
+  cursor: url("../cursor/pointer.cur"), pointer;
+  white-space: nowrap;
+  font-family: "Pixelated MS Sans Serif", Arial, sans-serif;
+  font-size: 11px;
+  color: #000;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+}
+.cs-option:hover,
+.cs-option.cs-hover {
+  background: var(--highlight);
+  color: #fff;
+}
+.cs-option.cs-selected {
+  background: var(--highlight);
+  color: #fff;
+  font-weight: 700;
 }

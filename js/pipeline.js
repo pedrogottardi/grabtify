@@ -8,6 +8,7 @@
 
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const tools = require("./tools");
 const resolveApi = require("./resolve_api");
 const validation = require("./validation");
@@ -90,6 +91,22 @@ function setProgress(emit, pct, label) {
 
 function log(emit, line, cls) {
   emit({ type: "log", line: line, cls: cls });
+}
+
+// Concise mode only logs milestones and errors; verbose mode also forwards the
+// raw tool chatter and internal steps. Every stage picks its wording itself.
+function isVerbose(opts) {
+  return !!(opts && opts.verbose_log);
+}
+
+// Emits a line only when the verbose log is enabled.
+function logVerbose(emit, opts, line, cls) {
+  if (isVerbose(opts)) log(emit, line, cls);
+}
+
+// Paths are noise in concise mode: show the file name unless verbosity is on.
+function fileName(p, opts) {
+  return isVerbose(opts) ? p : path.basename(p || "");
 }
 
 // ------------------------------------------------------------- stage 01 ----
@@ -180,8 +197,9 @@ async function download(opts, cancelState, emit) {
     }
 
     // Keep the log to what the job is doing: everything else yt-dlp prints
-    // (the echoed command, [info] chatter, warnings) is suppressed.
-    if (/^ERROR/i.test(line)) log(emit, line, "err");
+    // (the echoed command, [info] chatter, warnings) is suppressed. Verbose
+    // mode also forwards the raw ERROR lines.
+    if (/^ERROR/i.test(line)) logVerbose(emit, opts, line, "err");
   }
 
   let code;
@@ -189,15 +207,17 @@ async function download(opts, cancelState, emit) {
     code = await tools.runTool(yt.cmd, args, onLine, cancelState);
   } catch (e) {
     if (e && e.code === "ENOENT") {
-      throw new Error(t("job.startYtdlp", [e.message, tools.toolHint("yt-dlp")]));
+      throw new Error(isVerbose(opts)
+        ? t("job.startYtdlp", [e.message, tools.toolHint("yt-dlp")])
+        : t("job.toolMissing"));
     }
     throw e;
   }
 
   if (cancelState.cancelled) throw new tools.JobCancelled();
   if (code !== 0) {
-    let msg = t("job.ytdlpExit", [code]);
-    if ((opts.url || "").toLowerCase().indexOf("instagram.com") !== -1) {
+    let msg = isVerbose(opts) ? t("job.ytdlpExit", [code]) : t("job.downloadFailed");
+    if (isVerbose(opts) && (opts.url || "").toLowerCase().indexOf("instagram.com") !== -1) {
       msg += t("job.instagramHint");
     }
     throw new Error(msg);
@@ -222,7 +242,7 @@ async function download(opts, cancelState, emit) {
   }
 
   setStage(emit, "fetch", "done", path.basename(finalFile));
-  log(emit, t("job.downloaded", [finalFile]), "ok");
+  log(emit, t("job.downloaded", [fileName(finalFile, opts)]), "ok");
   return finalFile;
 }
 
@@ -259,7 +279,9 @@ async function cutLocal(inputFile, opts, cancelState, emit) {
 
   setStage(emit, "cut", "active", t("job.cutting"));
   setProgress(emit, null, t("job.cutting"));
-  log(emit, t("job.downloadTrim", [s, e]), "note");
+  log(emit, isVerbose(opts)
+    ? t("job.downloadTrim", [s, e])
+    : t("job.trimmingTo", [s, e]), "note");
 
   const totalDur = tools.mediaDuration(inputFile);
   const span = (endS !== null ? endS : totalDur) - startS;
@@ -280,7 +302,7 @@ async function cutLocal(inputFile, opts, cancelState, emit) {
     const pct = Math.min(100, Math.max(0, ((secs - startS) / span) * 100));
     setProgress(emit, pct, t("job.cuttingPct", [pct.toFixed(1)]));
     setStage(emit, "cut", "active", Math.floor(pct) + "%");
-    if (/error/i.test(line)) log(emit, line, "err");
+    if (/error/i.test(line)) logVerbose(emit, opts, line, "err");
   }
 
   const ffmpeg = tools.resolveTool("ffmpeg");
@@ -289,7 +311,9 @@ async function cutLocal(inputFile, opts, cancelState, emit) {
     code = await tools.runTool(ffmpeg.cmd, args, onLine, cancelState);
   } catch (e) {
     if (e && e.code === "ENOENT") {
-      throw new Error(t("job.startFfmpeg", [e.message, tools.toolHint("ffmpeg")]));
+      throw new Error(isVerbose(opts)
+        ? t("job.startFfmpeg", [e.message, tools.toolHint("ffmpeg")])
+        : t("job.toolMissing"));
     }
     throw e;
   }
@@ -302,13 +326,13 @@ async function cutLocal(inputFile, opts, cancelState, emit) {
   }
 
   setStage(emit, "cut", "done", path.basename(cutFile));
-  log(emit, t("job.cutDone", [cutFile]), "ok");
+  log(emit, t("job.cutDone", [fileName(cutFile, opts)]), "ok");
 
   try {
     fs.unlinkSync(inputFile);
-    log(emit, t("job.removedRaw"), "note");
+    logVerbose(emit, opts, t("job.removedRaw"), "note");
   } catch (e) {
-    log(emit, t("job.couldNotRemove", [e.message]), "note");
+    logVerbose(emit, opts, t("job.couldNotRemove", [e.message]), "note");
   }
   return cutFile;
 }
@@ -321,6 +345,241 @@ async function cutLocal(inputFile, opts, cancelState, emit) {
 // visually-lossless CRF 18 / AAC 192k pair.
 const PRESET_CRF = { crf18: 18, crf21: 21, crf23: 23 };
 
+// Experimental effects map to ffmpeg filter chains. A descriptor is either
+// null (no effect), { vf } for a plain -vf chain, or { filterComplex,
+// outLabel, ... } for a graph (which needs explicit -map). "mosh" needs the
+// two-pass Xvid pre-pass first (see datamoshPrep) and builds its graph on the
+// intermediate ([1:v]) while audio stays on the original input ([0]).
+function effectArgs(effect, hasAudio) {
+  switch (effect) {
+    case "off":
+    case null:
+    case undefined:
+    case "":
+      return null;
+    case "smear":
+      return {
+        filterComplex:
+          "[0:v]split[a][b];" +
+          "[a]setpts=PTS+0.2/TB[l];" +
+          "[b][l]blend=all_mode=difference:all_opacity=0.5[d];" +
+          "[b][d]blend=all_mode=screen[out]",
+        outLabel: "[out]",
+      };
+    case "mosh":
+      return {
+        prep: "mosh",
+        filterComplex:
+          "[1:v]split[a][b];" +
+          "[a]setpts=PTS+0.35/TB[l];" +
+          "[b][l]blend=all_mode=difference:all_opacity=0.7[d];" +
+          "[b][d]blend=all_mode=screen[m];" +
+          "[m]tmix=frames=4[out]",
+        outLabel: "[out]",
+        longGop: true,
+      };
+    case "glitch":
+      return {
+        vf: "rgbashift=rh=6:bh=-6:edge=smear,noise=alls=9:allf=t,eq=saturation=1.15",
+      };
+    case "vhs":
+      if (hasAudio) {
+        return {
+          filterComplex:
+            "[0:v]rgbashift=rh=3:bh=-3," +
+            "crop=in_w-4:in_h:2+2*sin(2*PI*0.6*t):0," +
+            "noise=alls=8:allf=t,vignette=PI/5," +
+            "eq=saturation=0.92:contrast=1.05,scale=-2:480[out];" +
+            "[0:a]highpass=f=100,lowpass=f=2800," +
+            "aresample=22050,aresample=48000," +
+            "acompressor=threshold=0.3:ratio=3[a];" +
+            "[1:a]volume=0.5[n];" +
+            "[a][n]amix=inputs=2:duration=first:normalize=0:dropout_transition=0[m];" +
+            "[m]alimiter=limit=0.95[amix]",
+          outLabel: "[out]",
+          mapAudio: "[amix]",
+          extraLavfi: true,
+          shortest: true,
+        };
+      }
+      return {
+        vf: "rgbashift=rh=3:bh=-3," +
+            "crop=in_w-4:in_h:2+2*sin(2*PI*0.6*t):0," +
+            "noise=alls=8:allf=t,vignette=PI/5," +
+            "eq=saturation=0.92:contrast=1.05,scale=-2:480",
+      };
+    case "pixel":
+      if (hasAudio) {
+        return {
+          filterComplex:
+            "[0:v]scale=-2:144:flags=neighbor,scale=-2:720:flags=neighbor[out];" +
+            "[0:a]aformat=channel_layouts=mono,aresample=11025,aresample=48000[amix]",
+          outLabel: "[out]",
+          mapAudio: "[amix]",
+        };
+      }
+      return { vf: "scale=-2:144:flags=neighbor,scale=-2:720:flags=neighbor" };
+    case "tiny240":
+      if (hasAudio) {
+        return {
+          filterComplex:
+            "[0:v]scale=-2:240[out];" +
+            "[0:a]aformat=channel_layouts=mono,aresample=8000," +
+            "lowpass=f=2600,highpass=f=300,aresample=48000[amix]",
+          outLabel: "[out]",
+          mapAudio: "[amix]",
+        };
+      }
+      return { vf: "scale=-2:240" };
+    case "poster":
+      return {
+        filterComplex:
+          "[0:v]split[a][b];" +
+          "[a]palettegen=max_colors=8:reserve_transparent=0[p];" +
+          "[b][p]paletteuse=dither=bayer:bayer_scale=5[out]",
+        outLabel: "[out]",
+      };
+    case "noir":
+      return { vf: "hue=s=0,noise=alls=12:allf=t,eq=contrast=1.35" };
+    case "crt":
+      return {
+        vf: "scale=-2:480," +
+            "geq=lum='if(lt(mod(Y,4),2),lum(X,Y)*0.78,lum(X,Y))'," +
+            "noise=alls=5:allf=t,vignette=PI/5",
+      };
+    case "trail":
+      return { vf: "tmix=frames=12" };
+    default:
+      return null;
+  }
+}
+
+// Video encoder selection: CPU (libx264, CRF) vs NVIDIA (h264_nvenc, CQ VBR).
+// The longGop variant (datamosh) needs wide keyframe spacing; sc_threshold/bf
+// are libx264-only options that NVENC rejects, so they only appear on CPU.
+function videoEncoderArgs(gpuOn, crf, longGop) {
+  const a = gpuOn
+    ? ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr",
+       "-cq", String(crf), "-b:v", "0", "-pix_fmt", "yuv420p"]
+    : ["-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-pix_fmt", "yuv420p"];
+  if (longGop) {
+    a.push("-g", "9999");
+    if (!gpuOn) a.push("-sc_threshold", "0", "-bf", "0");
+  }
+  return a;
+}
+
+// Experimental audio effects map to ffmpeg -af chains. They run in both video
+// (MP4) and audio (MP3) modes; a null/off value means "no audio processing".
+function audioEffectArgs(effect) {
+  switch (effect) {
+    case "off":
+    case null:
+    case undefined:
+    case "":
+      return null;
+    case "echo":
+      return "aecho=0.8:0.9:1000:0.3";
+    case "reverb":
+      return "aecho=0.8:0.88:60:0.4,aecho=0.8:0.7:180:0.3";
+    case "radio":
+      return "highpass=f=300,lowpass=f=3400,acompressor=threshold=0.2:ratio=4";
+    case "nightcore":
+      return "asetrate=44100*1.15,aresample=44100";
+    case "deep":
+      return "asetrate=44100*0.85,aresample=44100";
+    case "bass":
+      return "bass=g=6:f=100";
+    case "tremolo":
+      return "tremolo=f=5:d=0.7";
+    case "crush":
+      return "acrusher=level_in=1:level_out=1:bits=8:mode=log:aa=1";
+    case "reverse":
+      return "areverse";
+    default:
+      return null;
+  }
+}
+
+// Wraps tools.runTool with the standard ffmpeg ENOENT handling. The mosh
+// pre-pass produces no progress output, so onLine is a no-op.
+async function runFfmpeg(ffmpeg, args, cancelState, opts) {
+  try {
+    return await tools.runTool(ffmpeg.cmd, args, function () {}, cancelState);
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      throw new Error(isVerbose(opts)
+        ? t("job.startFfmpeg", [e.message, tools.toolHint("ffmpeg")])
+        : t("job.toolMissing"));
+    }
+    throw e;
+  }
+}
+
+// First half of the two-pass datamosh ("mosh"): re-encode the clip as
+// MPEG-4/Xvid with a huge GOP, few B-frames and no scene-cut keyframes. That
+// pushes every frame onto one long prediction chain and adds generational
+// loss, so the blend/tmix graph in effectArgs("mosh") has real artifacts to
+// chew on. The trimmed range is honoured here (the second pass filters the
+// intermediate, not the original input).
+async function datamoshPrep(inputFile, opts, cancelState, emit) {
+  logVerbose(emit, opts, t("job.moshPrep"), "note");
+  const ffmpeg = tools.resolveTool("ffmpeg");
+  const tag = "grabtify-mosh-" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+  const avi = path.join(os.tmpdir(), tag + ".avi");
+
+  const pre = ["-y", "-hide_banner", "-nostats"];
+  if (opts.trim && opts.trim_method === "ffmpeg") {
+    const startS = opts.time_in === null || opts.time_in === undefined ? 0 : opts.time_in;
+    pre.push("-ss", fmtSeconds(startS));
+    if (opts.time_out !== null && opts.time_out !== undefined) {
+      pre.push("-t", fmtSeconds(Math.max(0.1, opts.time_out - startS)));
+    }
+  }
+  const args = pre.concat([
+    "-i", inputFile,
+    "-map", "0:v:0",
+    "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+    "-an",
+    "-c:v", "mpeg4", "-vtag", "xvid",
+    "-qscale:v", "4",
+    "-g", "9999", "-bf", "0", "-sc_threshold", "0",
+    avi,
+  ]);
+
+  const code = await runFfmpeg(ffmpeg, args, cancelState, opts);
+  if (cancelState.cancelled) throw new tools.JobCancelled();
+  if (code !== 0 || !fs.existsSync(avi)) {
+    try { if (fs.existsSync(avi)) fs.unlinkSync(avi); } catch (e) {}
+    throw new Error(t("job.ffmpegExit", [code]));
+  }
+  return avi;
+}
+
+// Pick a unique output path for the encode stage. A timestamp is baked into
+// the name so every job produces a distinct file: Resolve's media pool caches
+// a file's analysis by path, so reusing the same path on a later run would
+// import the OLD pool item (stale audio/video) instead of re-scanning the
+// overwritten file. Collisions (two jobs in the same second) fall back to a
+// numeric suffix.
+function pickOutFile(base, isAudio, now, exists) {
+  const ts = new Date(now === undefined ? Date.now() : now);
+  const pad = (n) => String(n).padStart(2, "0");
+  const stamp =
+    ts.getFullYear() + pad(ts.getMonth() + 1) + pad(ts.getDate()) +
+    "-" + pad(ts.getHours()) + pad(ts.getMinutes()) + pad(ts.getSeconds());
+  const ext = isAudio ? ".mp3" : ".mp4";
+  const stem = isAudio ? base + "-" + stamp : base + "-converted-" + stamp;
+  const existsFn = typeof exists === "function" ? exists : fs.existsSync;
+  let outFile = stem + ext;
+  let suffix = 2;
+  while (existsFn(outFile)) {
+    outFile = stem + "-" + suffix + ext;
+    suffix += 1;
+  }
+  return outFile;
+}
+
 async function encode(inputFile, opts, cancelState, emit) {
   setStage(emit, "encode", "active", t("job.starting"));
   setProgress(emit, 0, t("job.encodingPct", ["0"]));
@@ -328,75 +587,118 @@ async function encode(inputFile, opts, cancelState, emit) {
   const isAudio = opts.mode === "audio";
   const ffmpeg = tools.resolveTool("ffmpeg");
   const base = inputFile.replace(/\.[^.\\/]+$/, "");
-  const stem = isAudio ? base + ".mp3" : base + "-converted.mp4";
-  let outFile = stem;
-  let suffix = 2;
-  for (;;) {
-    const clash = outFile.toLowerCase() === inputFile.toLowerCase() || fs.existsSync(outFile);
-    if (clash) {
-      if (outFile.toLowerCase() !== inputFile.toLowerCase()) {
-        try {
-          fs.unlinkSync(outFile);
-          break;
-        } catch (e) {
-          log(emit, t("job.encodeClash"), "note");
-        }
-      }
-      outFile = isAudio
-        ? base + "-" + suffix + ".mp3"
-        : base + "-converted-" + suffix + ".mp4";
-      suffix += 1;
-    } else {
-      break;
-    }
-  }
+  const outFile = pickOutFile(base, isAudio);
 
   const crf = opts.auto_encode
     ? PRESET_CRF.crf18
     : (PRESET_CRF[opts.preset] !== undefined ? PRESET_CRF[opts.preset] : PRESET_CRF.crf21);
-  const args = ["-hide_banner", "-nostats", "-y", "-i", inputFile];
 
-  if (opts.trim && opts.trim_method === "ffmpeg") {
+  const hasAudio = tools.mediaHasAudio(inputFile);
+  const efx = isAudio ? null : effectArgs(opts.effect, hasAudio);
+  const afx = audioEffectArgs(opts.audio_effect);
+  const tempFiles = [];
+
+  // Extra inputs resolved once (datamosh intermediate, lavfi noise source);
+  // the argument list is rebuilt per encode attempt so a GPU failure can
+  // retry the exact same command with the CPU encoder.
+  const extraInputs = [];
+  if (efx && efx.prep === "mosh") {
+    const avi = await datamoshPrep(inputFile, opts, cancelState, emit);
+    tempFiles.push(avi);
+    extraInputs.push("-i", avi);
+  }
+  if (efx && efx.extraLavfi) {
+    const dur = tools.mediaDuration(inputFile) || 30;
+    extraInputs.push("-f", "lavfi", "-i",
+      "anoisesrc=color=pink:amplitude=0.05:sample_rate=44100:duration=" + dur);
+  }
+
+  if (opts.trim && opts.trim_method === "ffmpeg" && !(efx && efx.prep === "mosh")) {
     const startS = opts.time_in === null || opts.time_in === undefined ? 0 : opts.time_in;
-    args.push("-ss", fmtSeconds(startS));
-    if (opts.time_out !== null && opts.time_out !== undefined) {
-      args.push("-t", fmtSeconds(Math.max(0.1, opts.time_out - startS)));
-    }
     let note = t("job.encodeTrimStart", [fmtSeconds(startS)]);
     if (opts.time_out !== null && opts.time_out !== undefined) {
       note += t("job.encodeTrimDur", [fmtSeconds(opts.time_out - startS)]);
     }
-    log(emit, note, "note");
+    logVerbose(emit, opts, note, "note");
   }
 
-  if (isAudio) {
-    const kbps = String(opts.audio_quality || "192");
-    args.push(
-      "-map", "a",
-      "-c:a", "libmp3lame",
-      "-b:a", kbps + "k",
-      "-f", "mp3",
-      "-progress", "pipe:1",
-      outFile
-    );
-  } else {
-    args.push(
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-crf", String(crf),
-      "-pix_fmt", "yuv420p",
-      "-c:a", "aac",
-      "-b:a", opts.auto_encode ? "192k" : "160k",
-      "-movflags", "+faststart",
-      "-f", "mp4",
-      "-progress", "pipe:1",
-      outFile
-    );
+  // Assembles the full ffmpeg command. gpuOn swaps the software x264 encoder
+  // for the NVIDIA hardware one; both keep the same CRF-like quality target.
+  function buildArgs(gpuOn) {
+    const a = ["-hide_banner", "-nostats", "-y", "-i", inputFile].concat(extraInputs);
+
+    if (opts.trim && opts.trim_method === "ffmpeg" && !(efx && efx.prep === "mosh")) {
+      const startS = opts.time_in === null || opts.time_in === undefined ? 0 : opts.time_in;
+      a.push("-ss", fmtSeconds(startS));
+      if (opts.time_out !== null && opts.time_out !== undefined) {
+        a.push("-t", fmtSeconds(Math.max(0.1, opts.time_out - startS)));
+      }
+    }
+
+    if (isAudio) {
+      const kbps = String(opts.audio_quality || "192");
+      a.push(
+        "-map", "a",
+        "-c:a", "libmp3lame",
+        "-b:a", kbps + "k"
+      );
+      if (afx) a.push("-af", afx);
+      a.push(
+        "-f", "mp3",
+        "-progress", "pipe:1",
+        outFile
+      );
+    } else {
+      if (efx) {
+        if (efx.filterComplex) {
+          let fc = efx.filterComplex;
+          let mapA = efx.mapAudio || "0:a?";
+          if (afx) {
+            if (efx.mapAudio) {
+              // Chain the audio effect onto the effect's own mixed audio output
+              // inside the graph (e.g. VHS/pixel/tiny240) instead of mixing -af
+              // with a complex filter graph.
+              fc = fc + ";" + efx.mapAudio + afx + "[aout]";
+              mapA = "[aout]";
+            } else {
+              a.push("-af", afx);
+            }
+          }
+          a.push("-filter_complex", fc);
+          a.push("-map", efx.outLabel);
+          a.push("-map", mapA);
+        } else {
+          a.push("-vf", efx.vf);
+          if (afx) a.push("-af", afx);
+        }
+        if (efx.shortest) a.push("-shortest");
+      } else if (afx) {
+        a.push("-af", afx);
+      }
+      if (gpuOn) {
+        a.push.apply(a, videoEncoderArgs(true, crf, !!(efx && efx.longGop)));
+      } else {
+        a.push.apply(a, videoEncoderArgs(false, crf, !!(efx && efx.longGop)));
+      }
+      a.push(
+        "-c:a", "aac",
+        "-b:a", opts.auto_encode ? "192k" : "160k",
+        "-movflags", "+faststart",
+        "-f", "mp4",
+        "-progress", "pipe:1",
+        outFile
+      );
+    }
+    return a;
   }
 
   log(emit, isAudio
-    ? t("job.encodingAudio", [path.basename(outFile), String(opts.audio_quality || "192")])
-    : t("job.encodingVideo", [path.basename(outFile), crf]), "note");
+    ? (isVerbose(opts)
+        ? t("job.encodingAudio", [path.basename(outFile), String(opts.audio_quality || "192")])
+        : t("job.convertingAudio"))
+    : (isVerbose(opts)
+        ? t("job.encodingVideo", [path.basename(outFile), crf])
+        : t("job.convertingVideo")), "note");
 
   // ffprobe gives us the source duration so ffmpeg's progress output can be
   // shown as a real percentage; if it fails we fall back to an indeterminate
@@ -417,41 +719,65 @@ async function encode(inputFile, opts, cancelState, emit) {
       setStage(emit, "encode", "active", Math.floor(pct) + "%");
       return;
     }
-    if (/error/i.test(line)) log(emit, line, "err");
+    if (/error/i.test(line)) logVerbose(emit, opts, line, "err");
   }
 
   let code;
-  try {
-    code = await tools.runTool(ffmpeg.cmd, args, onLine, cancelState);
-  } catch (e) {
-    if (e && e.code === "ENOENT") {
-      throw new Error(t("job.startFfmpeg", [e.message, tools.toolHint("ffmpeg")]));
+  // NVIDIA hardware encode is the fast path; if it ever fails at runtime
+  // (driver hiccup, GPU in use) we transparently retry once on the CPU so the
+  // job never dies over the hardware encoder.
+  const gpuWanted = !!opts.gpu_encode && !isAudio;
+  const attempts = gpuWanted ? [true, false] : [false];
+  for (const useGpu of attempts) {
+    if (useGpu) logVerbose(emit, opts, t("job.usingGpu"), "note");
+    const args = buildArgs(useGpu);
+    try {
+      code = await tools.runTool(ffmpeg.cmd, args, onLine, cancelState);
+    } catch (e) {
+      if (e && e.code === "ENOENT") {
+        throw new Error(isVerbose(opts)
+          ? t("job.startFfmpeg", [e.message, tools.toolHint("ffmpeg")])
+          : t("job.toolMissing"));
+      }
+      throw e;
     }
-    throw e;
+    if (code === 0 || cancelState.cancelled) break;
+    if (useGpu) {
+      log(emit, isVerbose(opts) ? t("job.usingGpuFallback") : t("job.gpuFallback"), "note");
+      continue;
+    }
+    break;
   }
 
   if (cancelState.cancelled) throw new tools.JobCancelled();
 
   if (code !== 0 || !fs.existsSync(outFile)) {
     try { if (fs.existsSync(outFile)) fs.unlinkSync(outFile); } catch (e) {}
+    for (const tmp of tempFiles) {
+      try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (e) {}
+    }
     if (opts.trim && opts.trim_method === "download") {
       try { if (fs.existsSync(inputFile)) fs.unlinkSync(inputFile); } catch (e) {}
     }
     if (opts.trim) {
       throw new Error(t("job.timestamps"));
     }
-    throw new Error(t("job.ffmpegExit", [code]));
+    throw new Error(isVerbose(opts) ? t("job.ffmpegExit", [code]) : t("job.encodeFailed"));
   }
 
   setStage(emit, "encode", "done", path.basename(outFile));
-  log(emit, t("job.encoded", [outFile]), "ok");
+  logVerbose(emit, opts, t("job.encoded", [outFile]), "ok");
+
+  for (const tmp of tempFiles) {
+    try { fs.unlinkSync(tmp); logVerbose(emit, opts, t("job.removedRaw"), "note"); } catch (e) {}
+  }
 
   // Only the final video is kept — the raw download goes.
   try {
     fs.unlinkSync(inputFile);
-    log(emit, t("job.removedRaw"), "note");
+    logVerbose(emit, opts, t("job.removedRaw"), "note");
   } catch (e) {
-    log(emit, t("job.couldNotRemove", [e.message]), "note");
+    logVerbose(emit, opts, t("job.couldNotRemove", [e.message]), "note");
   }
   return outFile;
 }
@@ -491,6 +817,8 @@ function successMessage(detail, bin) {
 // isn't already Resolve-friendly (isReady = tools.isResolveReady result).
 function shouldEncode(opts, isReady) {
   if (opts.mode === "audio") return true;
+  if (opts.effect && opts.effect !== "off") return true;
+  if (opts.audio_effect && opts.audio_effect !== "off") return true;
   if (opts.convert === true) return true;
   if (opts.trim && opts.trim_method === "ffmpeg") return true;
   if (opts.auto_encode && !isReady) return true;
@@ -505,7 +833,12 @@ function runJob(opts, emit, cancelState) {
     .then(() => download(opts, cancelState, emit))
     .then((rawFile) => {
       const isAudio = opts.mode === "audio";
-      const afterMedia = (finalFile) => sendToResolve(finalFile, opts.insert_mode, isAudio, cancelState, emit);
+      const afterMedia = (finalFile) => {
+        // Concise mode keeps paths out of the running log; the single full
+        // path is the "Saved to:" line before the handoff to Resolve.
+        if (!isVerbose(opts)) log(emit, t("job.savedTo", [finalFile]), "ok");
+        return sendToResolve(finalFile, opts.insert_mode, isAudio, cancelState, emit);
+      };
       const isReady = isAudio ? false : tools.isResolveReady(rawFile);
       if (shouldEncode(opts, isReady)) {
         return encode(rawFile, opts, cancelState, emit).then(afterMedia);
@@ -526,6 +859,11 @@ module.exports = {
   friendlyHost,
   encodePct,
   shouldEncode,
+  effectArgs,
+  audioEffectArgs,
+  videoEncoderArgs,
+  datamoshPrep,
+  pickOutFile,
   download,
   encode,
   sendToResolve,
