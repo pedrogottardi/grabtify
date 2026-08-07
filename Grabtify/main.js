@@ -15,7 +15,7 @@ const fs = require("fs");
 const settingsMod = require("./js/settings");
 const toolsMod = require("./js/tools");
 const pipeline = require("./js/pipeline");
-const resolveApiModule = require("./js/resolve_api");
+const resolveApi = require("./js/resolve_api");
 const updater = require("./js/updater");
 const i18n = require("./js/i18n");
 
@@ -42,11 +42,11 @@ try {
 
 // The Resolve-facing API instance lives here; pipeline.js reaches it through
 // the module-level bridge (resolve_api.importAndInsert delegates to this).
-const resolveApi = resolveApiModule.createApi(WorkflowIntegration);
-resolveApiModule.setActiveApi(resolveApi);
+const resolveApiInstance = resolveApi.createApi(WorkflowIntegration);
+resolveApi.setActiveApi(resolveApiInstance);
 
 let win = null;
-let activeJob = null; // { running: bool, cancelState: {cancelled, child} }
+let activeJob = null; // cancel state of the running job ({cancelled, child}), null when idle
 
 // GPU detection result, cached so a running job and the panel agree. Refreshed
 // on boot and whenever the user hits "Check again" in Settings.
@@ -58,11 +58,10 @@ function detectGpuCached() {
 
 // "auto" and "on" both enable the hardware encoder whenever an NVIDIA GPU is
 // actually present; "off" (or a GPU-less machine) keeps encoding on the CPU.
-function gpuEncodeForJob() {
+function gpuEncodeForJob(settings) {
   const gpu = detectGpuCached();
   if (!gpu.available) return false;
-  const mode = settingsMod.load().gpuEncode;
-  return mode === "on" || mode === "auto";
+  return settings.gpuEncode === "on" || settings.gpuEncode === "auto";
 }
 
 const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -90,7 +89,7 @@ function resolveStatus() {
     };
   }
   try {
-    const ok = resolveApi.isResolveRunning();
+    const ok = resolveApiInstance.isResolveRunning();
     return {
       ok: ok,
       message: ok ? t("resolve.connected") : t("resolve.notResponding"),
@@ -146,12 +145,15 @@ function registerIpc() {
   });
 
   ipcMain.handle("grabtify:start-job", async (_e, opts) => {
-    useLanguage();
+    // Persisted settings drive the job's language and GPU mode; load them once
+    // instead of once per helper.
+    const settings = settingsMod.load();
+    i18n.setLanguage(settings.language);
     if (opts && opts.language) i18n.setLanguage(opts.language);
     if (!opts || typeof opts !== "object") {
       throw new Error(t("main.noOptions"));
     }
-    if (activeJob && activeJob.running) {
+    if (activeJob) {
       throw new Error(t("main.jobRunning"));
     }
 
@@ -182,13 +184,13 @@ function registerIpc() {
       audio_quality: opts.audio_quality || settingsMod.DEFAULTS.audioQuality,
       effect: opts.effect || settingsMod.DEFAULTS.effect,
       audio_effect: opts.audio_effect || settingsMod.DEFAULTS.audioEffect,
-      gpu_encode: gpuEncodeForJob(),
+      gpu_encode: gpuEncodeForJob(settings),
       verbose_log: !!opts.verbose_log,
       out_dir: outDir,
     };
 
     const cancelState = { cancelled: false, child: null };
-    activeJob = { running: true, cancelState: cancelState };
+    activeJob = cancelState;
 
     pipeline
       .runJob(jobOpts, emit, cancelState)
@@ -210,8 +212,8 @@ function registerIpc() {
   });
 
   ipcMain.handle("grabtify:cancel-job", () => {
-    if (activeJob && activeJob.running) {
-      toolsMod.cancel(activeJob.cancelState);
+    if (activeJob) {
+      toolsMod.cancel(activeJob);
       return { ok: true };
     }
     return { ok: false };
@@ -284,7 +286,7 @@ function registerIpc() {
 
   ipcMain.handle("grabtify:update-tools", async (_e, ids) => {
     useLanguage();
-    if (activeJob && activeJob.running) {
+    if (activeJob) {
       return { ok: false, err: t("updates.jobRunning") };
     }
     const list = Array.isArray(ids) ? ids : [];
@@ -320,7 +322,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 600,
     height: 560,
-    icon: path.join(__dirname, "newico.png"),
+    icon: path.join(__dirname, "assets", "newico.png"),
     minWidth: 560,
     minHeight: 520,
     resizable: false,

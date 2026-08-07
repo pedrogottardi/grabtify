@@ -96,7 +96,7 @@ Re-run `install.bat` anytime to update or after moving Resolve — it's idempote
 <summary><strong>Manual install (without install.bat)</strong></summary>
 
 1. Close DaVinci Resolve.
-2. Copy runtime files to `C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins\com.grabtify.plugin` (exact folder name required). Files: `manifest.xml`, `package.json`, `index.html`, `main.js`, `preload.js`, `newico.png`, `css/`, `js/`, `bin/`.
+2. Copy the contents of the `Grabtify\` folder to `C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Workflow Integration Plugins\com.grabtify.plugin` (exact folder name required). Files: `manifest.xml`, `package.json`, `index.html`, `main.js`, `preload.js`, `assets/` (includes `newico.png`, `header.png`, `cursor/`), `css/`, `js/`, `bin/`.
 3. Ensure `WorkflowIntegration.node` sits next to `main.js` (get from Help → Documentation → Developer → "Workflow Integration Plugins" if missing).
 4. Install tools to `bin\win\` or PATH: yt-dlp.exe, ffmpeg.exe, ffprobe.exe, deno.exe.
 5. Restart Resolve Studio.

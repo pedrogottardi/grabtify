@@ -5,13 +5,13 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const pipeline = require("../js/pipeline");
-const tools = require("../js/tools");
-const settings = require("../js/settings");
-const resolveApi = require("../js/resolve_api");
-const validation = require("../js/validation");
-const i18n = require("../js/i18n");
-const updater = require("../js/updater");
+const pipeline = require("../../js/pipeline");
+const tools = require("../../js/tools");
+const settings = require("../../js/settings");
+const resolveApi = require("../../js/resolve_api");
+const validation = require("../../js/validation");
+const i18n = require("../../js/i18n");
+const updater = require("../../js/updater");
 
 function fakeResolveApi(mediaItem, opts) {
   opts = opts || {};
@@ -157,74 +157,130 @@ test("friendlyHost strips www and falls back gracefully", () => {
 });
 
 test("settings load returns defaults and round-trips", () => {
-  const before = settings.load();
-  assert.ok(Object.prototype.hasOwnProperty.call(before, "quality"));
-  assert.ok(Object.prototype.hasOwnProperty.call(before, "insertMode"));
-  settings.save(Object.assign({}, before, { quality: "2160" }));
-  const after = settings.load();
-  assert.strictEqual(after.quality, "2160");
-  settings.save(before);
-  const restored = settings.load();
-  assert.strictEqual(restored.quality, before.quality);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-settings-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    const before = settings.load();
+    assert.ok(Object.prototype.hasOwnProperty.call(before, "quality"));
+    assert.ok(Object.prototype.hasOwnProperty.call(before, "insertMode"));
+    settings.save(Object.assign({}, before, { quality: "2160" }));
+    const after = settings.load();
+    assert.strictEqual(after.quality, "2160");
+    settings.save(before);
+    const restored = settings.load();
+    assert.strictEqual(restored.quality, before.quality);
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("settings normalize stale preset and trim values", () => {
-  const before = settings.load();
-  settings.save(Object.assign({}, before, { preset: "Fast 1080p30", trimMethod: "handbrake" }));
-  const after = settings.load();
-  assert.strictEqual(after.preset, "crf21");
-  assert.strictEqual(after.trimMethod, "download");
-  settings.save(before);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-settings-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    const before = settings.load();
+    settings.save(Object.assign({}, before, { preset: "Fast 1080p30", trimMethod: "handbrake" }));
+    const after = settings.load();
+    assert.strictEqual(after.preset, "crf21");
+    assert.strictEqual(after.trimMethod, "download");
+    settings.save(before);
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("settings normalize stale mode and audio quality values", () => {
-  const before = settings.load();
-  settings.save(Object.assign({}, before, { mode: "wav", audioQuality: "999" }));
-  const after = settings.load();
-  assert.strictEqual(after.mode, "video");
-  assert.strictEqual(after.audioQuality, "192");
-  settings.save(before);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-settings-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    const before = settings.load();
+    settings.save(Object.assign({}, before, { mode: "wav", audioQuality: "999" }));
+    const after = settings.load();
+    assert.strictEqual(after.mode, "video");
+    assert.strictEqual(after.audioQuality, "192");
+    settings.save(before);
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("settings autoEncode defaults true and round-trips", () => {
   assert.strictEqual(settings.DEFAULTS.autoEncode, true);
-  const before = settings.load();
-  assert.strictEqual(typeof before.autoEncode, "boolean");
-  settings.save(Object.assign({}, before, { autoEncode: !before.autoEncode }));
-  assert.strictEqual(settings.load().autoEncode, !before.autoEncode);
-  settings.save(before);
-  assert.strictEqual(settings.load().autoEncode, before.autoEncode);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-settings-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    const before = settings.load();
+    assert.strictEqual(typeof before.autoEncode, "boolean");
+    settings.save(Object.assign({}, before, { autoEncode: !before.autoEncode }));
+    assert.strictEqual(settings.load().autoEncode, !before.autoEncode);
+    settings.save(before);
+    assert.strictEqual(settings.load().autoEncode, before.autoEncode);
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("settings gpuEncode defaults to auto, round-trips, and normalizes junk", () => {
   assert.strictEqual(settings.DEFAULTS.gpuEncode, "auto");
-  const before = settings.load();
-  assert.strictEqual(before.gpuEncode, "auto");
-  settings.save(Object.assign({}, before, { gpuEncode: "on" }));
-  assert.strictEqual(settings.load().gpuEncode, "on");
-  settings.save(Object.assign({}, before, { gpuEncode: "bogus" }));
-  assert.strictEqual(settings.load().gpuEncode, "auto");
-  settings.save(before);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-settings-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    const before = settings.load();
+    assert.strictEqual(before.gpuEncode, "auto");
+    settings.save(Object.assign({}, before, { gpuEncode: "on" }));
+    assert.strictEqual(settings.load().gpuEncode, "on");
+    settings.save(Object.assign({}, before, { gpuEncode: "bogus" }));
+    assert.strictEqual(settings.load().gpuEncode, "auto");
+    settings.save(before);
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("settings verboseLog defaults to false, round-trips booleans", () => {
   assert.strictEqual(settings.DEFAULTS.verboseLog, false);
-  const before = settings.load();
-  assert.strictEqual(before.verboseLog, false);
-  settings.save(Object.assign({}, before, { verboseLog: true }));
-  assert.strictEqual(settings.load().verboseLog, true);
-  settings.save(Object.assign({}, before, { verboseLog: false }));
-  assert.strictEqual(settings.load().verboseLog, false);
-  settings.save(before);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-settings-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    const before = settings.load();
+    assert.strictEqual(before.verboseLog, false);
+    settings.save(Object.assign({}, before, { verboseLog: true }));
+    assert.strictEqual(settings.load().verboseLog, true);
+    settings.save(Object.assign({}, before, { verboseLog: false }));
+    assert.strictEqual(settings.load().verboseLog, false);
+    settings.save(before);
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("settings verboseLog normalizes non-boolean to default", () => {
-  const before = settings.load();
-  settings.save(Object.assign({}, before, { verboseLog: "yes" }));
-  assert.strictEqual(settings.load().verboseLog, false);
-  settings.save(Object.assign({}, before, { verboseLog: null }));
-  assert.strictEqual(settings.load().verboseLog, false);
-  settings.save(before);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grabtify-settings-"));
+  const saved = settings.settingsPath;
+  settings.settingsPath = () => path.join(dir, "settings.json");
+  try {
+    const before = settings.load();
+    settings.save(Object.assign({}, before, { verboseLog: "yes" }));
+    assert.strictEqual(settings.load().verboseLog, false);
+    settings.save(Object.assign({}, before, { verboseLog: null }));
+    assert.strictEqual(settings.load().verboseLog, false);
+    settings.save(before);
+  } finally {
+    settings.settingsPath = saved;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("GPU_ENCODE_MODES drives the gpu dropdown and each label resolves", () => {
@@ -285,7 +341,7 @@ test("isResolveReady returns false when the probe fails", () => {
 });
 
 test("main.js boot payload exposes every settings dropdown array", () => {
-  const src = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf-8");
+  const src = fs.readFileSync(path.join(__dirname, "..", "..", "main.js"), "utf-8");
   for (const key of ["QUALITIES", "AUDIO_QUALITIES", "MODES", "INSERT_MODES",
                      "TRIM_METHODS", "PRESETS", "EFFECTS", "AUDIO_EFFECTS",
                      "LANGUAGES", "GPU_ENCODE_MODES"]) {
@@ -297,7 +353,7 @@ test("main.js boot payload exposes every settings dropdown array", () => {
 });
 
 test("main.js start-job maps every renderer option into jobOpts", () => {
-  const src = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf-8");
+  const src = fs.readFileSync(path.join(__dirname, "..", "..", "main.js"), "utf-8");
   const block = src.split("grabtify:start-job")[1] || "";
   for (const field of ["mode", "quality", "preset", "convert", "auto_encode",
                        "insert_mode", "audio_quality", "effect", "audio_effect"]) {
@@ -305,7 +361,7 @@ test("main.js start-job maps every renderer option into jobOpts", () => {
       new RegExp("^\\s*" + field + ": opts\\.", "m").test(block),
       "start-job must map " + field + " into jobOpts");
   }
-  assert.ok(/\n\s*gpu_encode: gpuEncodeForJob\(\),/.test(block), "start-job must map gpu_encode");
+  assert.ok(/\n\s*gpu_encode: gpuEncodeForJob\(settings\),/.test(block), "start-job must map gpu_encode");
   assert.ok(/\n\s*verbose_log: !!opts\.verbose_log,/.test(block), "start-job must map verbose_log");
   assert.ok(/\n\s*out_dir: outDir,/.test(block), "start-job must map out_dir into jobOpts");
 });

@@ -60,22 +60,27 @@ function friendlyHost(url) {
   }
 }
 
-// Turn an ffmpeg -progress line into a 0-100 percentage. The progress output
+// Parse an ffmpeg -progress line into encoded seconds. The progress output
 // reports the encoded time either as out_time_ms (microseconds) or as
-// out_time=HH:MM:SS.micro; anything else is ignored.
-function encodePct(line, totalDur) {
-  if (!totalDur || totalDur <= 0) return null;
-  let secs = null;
+// out_time=HH:MM:SS.micro; anything else is not a progress timestamp and
+// returns null.
+function parseOutTime(line) {
   const ms = /out_time_ms=(\d+)/.exec(line);
   if (ms) {
-    secs = parseFloat(ms[1]) / 1e6;
-  } else {
-    const t = /out_time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(line);
-    if (t) {
-      secs = parseFloat(t[1]) * 3600 + parseFloat(t[2]) * 60 + parseFloat(t[3]);
-    }
+    const s = parseFloat(ms[1]) / 1e6;
+    return isFinite(s) ? s : null;
   }
-  if (secs === null || !isFinite(secs)) return null;
+  const t = /out_time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(line);
+  if (!t) return null;
+  const s = parseFloat(t[1]) * 3600 + parseFloat(t[2]) * 60 + parseFloat(t[3]);
+  return isFinite(s) ? s : null;
+}
+
+// Turn an ffmpeg -progress line into a 0-100 percentage of the encode.
+function encodePct(line, totalDur) {
+  if (!totalDur || totalDur <= 0) return null;
+  const secs = parseOutTime(line);
+  if (secs === null) return null;
   return Math.min(100, (secs / totalDur) * 100);
 }
 
@@ -291,14 +296,8 @@ async function cutLocal(inputFile, opts, cancelState, emit) {
       setProgress(emit, 100, t("job.cuttingPct", ["100"]));
       return;
     }
-    let secs = null;
-    const ms = /out_time_ms=(\d+)/.exec(line);
-    if (ms) secs = parseFloat(ms[1]) / 1e6;
-    else {
-      const t2 = /out_time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(line);
-      if (t2) secs = parseFloat(t2[1]) * 3600 + parseFloat(t2[2]) * 60 + parseFloat(t2[3]);
-    }
-    if (secs === null || !isFinite(secs) || !span || span <= 0) return;
+    const secs = parseOutTime(line);
+    if (secs === null || !span || span <= 0) return;
     const pct = Math.min(100, Math.max(0, ((secs - startS) / span) * 100));
     setProgress(emit, pct, t("job.cuttingPct", [pct.toFixed(1)]));
     setStage(emit, "cut", "active", Math.floor(pct) + "%");

@@ -5,6 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const { spawn, spawnSync } = require("child_process");
 const i18n = require("./i18n");
 
@@ -20,8 +21,8 @@ const EXTRA_DIRS = IS_WIN
       "/opt/homebrew/bin",
       "/usr/local/bin",
       "/opt/local/bin",
-      path.join(require("os").homedir(), ".local", "bin"),
-      path.join(require("os").homedir(), "bin"),
+      path.join(os.homedir(), ".local", "bin"),
+      path.join(os.homedir(), "bin"),
     ];
 
 function pluginRoot() {
@@ -427,7 +428,6 @@ function newestMediaFile(directory, sinceMs, allowExisting) {
 }
 
 module.exports = {
-  IS_WIN,
   pluginRoot,
   binDir,
   resolveTool,

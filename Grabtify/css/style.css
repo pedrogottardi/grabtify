@@ -38,7 +38,7 @@ body {
   font-family: "Pixelated MS Sans Serif", Tahoma, "MS Sans Serif", Arial, sans-serif;
   font-size: 11px;
   overflow-x: hidden;
-  cursor: url("../cursor/cursor.cur"), auto;
+  cursor: url("../assets/cursor/cursor.cur"), auto;
 }
 
 /* Accented letters (pt-BR) now come from the pixel font itself, so no
@@ -58,14 +58,14 @@ body {
  * draggable titlebar keeps the OS cursor (app-region: drag ignores CSS).
  * *{cursor:inherit} forces the url() cursor down every element — Chromium
  * otherwise fails to apply url() cursors through plain inheritance. */
-a { cursor: url("../cursor/pointer.cur"), pointer; }
-button { cursor: url("../cursor/pointer.cur"), pointer; }
-select { cursor: url("../cursor/cursor.cur"), default; }
-option { cursor: url("../cursor/pointer.cur"), pointer; }
+a { cursor: url("../assets/cursor/pointer.cur"), pointer; }
+button { cursor: url("../assets/cursor/pointer.cur"), pointer; }
+select { cursor: url("../assets/cursor/cursor.cur"), default; }
+option { cursor: url("../assets/cursor/pointer.cur"), pointer; }
 input[type="checkbox"],
-input[type="radio"] { cursor: url("../cursor/cursor.cur"), default; }
+input[type="radio"] { cursor: url("../assets/cursor/cursor.cur"), default; }
 input[type="checkbox"] + label,
-input[type="radio"] + label { cursor: url("../cursor/cursor.cur"), default; }
+input[type="radio"] + label { cursor: url("../assets/cursor/cursor.cur"), default; }
 input[type="text"],
 input[type="url"],
 input[type="password"],
@@ -76,7 +76,7 @@ textarea { cursor: text; }
  * pointer/help/text rules above by specificity; the draggable titlebar still
  * keeps the OS cursor). */
 body.busy,
-body.busy * { cursor: url("../cursor/loading.cur"), wait; }
+body.busy * { cursor: url("../assets/cursor/loading.cur"), wait; }
 
 /* -------------------------------------------------------------- app window --- */
 .app-main {
@@ -95,7 +95,14 @@ body.busy * { cursor: url("../cursor/loading.cur"), wait; }
   overflow-y: auto;
 }
 .status-bar { margin-top: 0; }
-.ver-field { flex: 0 0 auto; min-width: 92px; text-align: center; }
+.ver-field { flex: 0 0 auto; min-width: 92px; }
+/* The pixel font only renders crisp when smoothing is off and text is
+ * rasterized for speed — same trio as .flabel / .cs-option. */
+.status-bar-field {
+  font-family: "Pixelated MS Sans Serif", Tahoma, "MS Sans Serif", Arial, sans-serif;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+}
 
 /* --------------------------------------------------------- frameless titlebar --- */
 .app-main > .title-bar {
@@ -117,7 +124,7 @@ body.busy * { cursor: url("../cursor/loading.cur"), wait; }
   background: transparent;
 }
 .boot,
-.boot * { cursor: url("../cursor/loading.cur"), wait; }
+.boot * { cursor: url("../assets/cursor/loading.cur"), wait; }
 .boot-win { width: 250px; }
 .boot-win .window-body {
   display: flex;
@@ -232,15 +239,26 @@ body.busy * { cursor: url("../cursor/loading.cur"), wait; }
 }
 .flabel em {
   font-style: normal;
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-soft);
-  font-family: Arial, sans-serif;
+  font-family: Tahoma, sans-serif;
 }
 .field input[type="text"],
 .field select {
   width: 100%;
 }
-input.tc { text-align: center; }
+input.tc {
+  text-align: center;
+  font-family: "Pixelated MS Sans Serif", Tahoma, "MS Sans Serif", Arial, sans-serif;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+  line-height: normal;
+}
+input.tc::placeholder {
+  font-family: "Pixelated MS Sans Serif", Tahoma, "MS Sans Serif", Arial, sans-serif;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+}
 input.invalid,
 select.invalid {
   outline: 2px solid var(--err);
@@ -265,7 +283,7 @@ select.invalid {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  cursor: url("../cursor/pointer.cur"), pointer;
+  cursor: url("../assets/cursor/pointer.cur"), pointer;
   user-select: none;
   font-weight: 700;
 }
@@ -312,8 +330,8 @@ select.invalid {
 .check-note {
   margin: 2px 0 0 32px;
   color: var(--text-soft);
-  font-size: 10px;
-  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-family: Tahoma, sans-serif;
 }
 /* The GPU acceleration field starts a new setting group below the encode
  * checkboxes. With auto-encode on the "Always encode" checkbox is hidden, so
@@ -335,7 +353,7 @@ select.invalid {
   background: var(--field);
   box-shadow: inset -1px -1px #fff, inset 1px 1px grey,
               inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a;
-  cursor: url("../cursor/question.cur"), help;
+  cursor: url("../assets/cursor/question.cur"), help;
 }
 .rig-row:last-child { margin-bottom: 0; }
 .rig-glyph {
@@ -369,16 +387,16 @@ select.invalid {
 .rig-row.bad .rig-state { color: var(--err); }
 .rig-name { font-weight: 700; white-space: nowrap; }
 .rig-role {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-soft);
   white-space: nowrap;
-  font-family: Arial, sans-serif;
+  font-family: Tahoma, sans-serif;
 }
 .rig-state {
   margin-left: auto;
   flex: none;
-  font-size: 10px;
-  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-family: Tahoma, sans-serif;
 }
 .rig-foot {
   display: flex;
@@ -388,7 +406,7 @@ select.invalid {
   padding-top: 6px;
 }
 .rig-btns { display: flex; align-items: center; gap: 6px; flex: none; }
-.rig-summary { font-size: 10px; font-family: Arial, sans-serif; }
+.rig-summary { font-size: 9px; font-family: Tahoma, sans-serif; }
 
 /* ------------------------------------------------------------ updates modal --- */
 .modal-overlay {
@@ -410,12 +428,12 @@ select.invalid {
 .modal-sub { margin: 2px 0 8px; }
 .modal-note {
   margin: 8px 0;
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-soft);
-  /* Small auxiliary text follows the app convention (Arial at 10px, same as
+  /* Small auxiliary text follows the app convention (Tahoma at 9px, same as
      .check-note / .flabel em / .rig-summary / .legal-note) so the pixel font,
      which only renders crisply at 11px, never gets scaled down. */
-  font-family: Arial, sans-serif;
+  font-family: Tahoma, sans-serif;
 }
 .upd-list {
   list-style: none;
@@ -435,12 +453,12 @@ select.invalid {
 .upd-row:last-child { margin-bottom: 0; }
 .upd-name { font-weight: 700; white-space: nowrap; }
 .upd-vers {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: Arial, sans-serif;
+  font-family: Tahoma, sans-serif;
 }
 .upd-row.outdated .upd-vers {
   background: var(--highlight);
@@ -450,8 +468,8 @@ select.invalid {
 .upd-state {
   margin-left: auto;
   flex: none;
-  font-size: 10px;
-  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-family: Tahoma, sans-serif;
 }
 .upd-state.downloading { color: var(--highlight); }
 .upd-state.done { color: #000; }
@@ -522,14 +540,19 @@ select.invalid {
   font-weight: 700;
   color: var(--text-soft);
 }
-.about-value { color: #222; }
+.about-value {
+  color: #222;
+  font-family: "Pixelated MS Sans Serif", Tahoma, "MS Sans Serif", Arial, sans-serif;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+}
 .creator-link { color: #0000ff; }
 .legal-note {
   margin: 8px 0 0;
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-soft);
   line-height: 1.4;
-  font-family: Arial, sans-serif;
+  font-family: Tahoma, sans-serif;
 }
 .kofi-link {
   display: inline-block;
@@ -566,7 +589,7 @@ body.mode-video .audio-only { display: none !important; }
   box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #fff,
               inset -2px -2px grey, inset 2px 2px #dfdfdf;
   margin-top: -1px;
-  cursor: url("../cursor/cursor.cur"), default;
+  cursor: url("../assets/cursor/cursor.cur"), default;
   -webkit-font-smoothing: none;
   text-rendering: optimizeSpeed;
 }
@@ -574,7 +597,7 @@ body.mode-video .audio-only { display: none !important; }
 /* Individual option. */
 .cs-option {
   padding: 2px 4px;
-  cursor: url("../cursor/pointer.cur"), pointer;
+  cursor: url("../assets/cursor/pointer.cur"), pointer;
   white-space: nowrap;
   font-family: "Pixelated MS Sans Serif", Arial, sans-serif;
   font-size: 11px;

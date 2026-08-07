@@ -63,8 +63,8 @@ if not exist "%INSTALL_ROOT%" (
     echo %ESC%[%GRN%m[OK]%ESC%[0m Created: %INSTALL_ROOT%
 )
 
-if not exist "%SRC%\manifest.xml" (
-    echo %ESC%[%RED%m[x]%ESC%[0m ERROR: manifest.xml not found next to install.bat. Are you
+if not exist "%SRC%\Grabtify\manifest.xml" (
+    echo %ESC%[%RED%m[x]%ESC%[0m ERROR: manifest.xml not found inside the Grabtify folder. Are you
     echo %ESC%[%DIM%m  running this from the extracted Grabtify folder?%ESC%[0m
     echo.
     pause
@@ -97,7 +97,7 @@ if defined RESOLVE_RUNNING (
 rem ---- copy the plugin (binaries and .node are managed separately, so
 rem the mirror never deletes a previously downloaded tool) ----
 echo %ESC%[%CYN%m[2/4]%ESC%[0m %ESC%[%WHT%mCopying plugin files...%ESC%[0m
-robocopy "%SRC%" "%DEST%" /MIR /XF install.bat uninstall.bat README.md LICENSE .gitignore *.zip *.exe WorkflowIntegration.node /XD .git test /NFL /NDL /NJH /NJS /NP /FP /R:3 /W:2 > "%TEMP%\grabtify-robocopy.log" 2>&1
+robocopy "%SRC%\Grabtify" "%DEST%" /MIR /XF install.bat uninstall.bat README.md LICENSE .gitignore *.zip *.exe WorkflowIntegration.node /XD .git dev /NFL /NDL /NJH /NJS /NP /FP /R:3 /W:2 > "%TEMP%\grabtify-robocopy.log" 2>&1
 set "RC=%errorlevel%"
 if %RC% geq 16 (
     echo %ESC%[%RED%m[x]%ESC%[0m ERROR: could not copy the plugin. Close DaVinci Resolve and your

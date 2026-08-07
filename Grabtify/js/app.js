@@ -1,7 +1,7 @@
 /* Grabtify — panel logic. Talks to the Electron main process through the
- * sandboxed preload bridge (window.grabtify over contextBridge + IPC) — the
- * Resolve >= 19.0.2 replacement for pywebview's window.pywebview.API. Same
- * three-stage pipeline as YOINK!: Fetch → Encode → Timeline.
+ * sandboxed preload bridge (window.grabtify over contextBridge + IPC), which
+ * is the model Resolve >= 19.0.2 enforces. Same three-stage pipeline as
+ * YOINK!: Fetch → Encode → Timeline.
  */
 "use strict";
 
@@ -88,12 +88,6 @@
       n.setAttribute("aria-label", I.translate(lang, n.getAttribute("data-i18n-aria")));
     });
     refreshRigWords();
-  }
-
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, (c) => {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
   }
 
   function truncate(s, n) {
@@ -283,7 +277,7 @@
     const seq = ++titleSeq;
     state.titleFetching = true;
     renderStatus();
-    const api = pyApi();
+    const api = bridge();
     if (!api || !api.fetchTitle) {
       state.titleFetching = false;
       renderStatus();
@@ -320,11 +314,11 @@
   }
 
   // ---------------------------------------------------------- host bridge --
-  function pyApi() {
+  function bridge() {
     return window.grabtify || null;
   }
   function isReady() {
-    return !!pyApi();
+    return !!bridge();
   }
 
   // ------------------- event sink: main process pushes events here ---------
@@ -526,7 +520,7 @@
   function wireUpdateUi() {
     if (el.checkUpdatesBtn) {
       el.checkUpdatesBtn.addEventListener("click", () => {
-        const api = pyApi();
+        const api = bridge();
         if (!api || !api.checkUpdates || state.running) return;
         const btn = el.checkUpdatesBtn;
         buttonFeedback(btn, t("status.checking"));
@@ -552,7 +546,7 @@
     if (el.updNowBtn) {
       el.updNowBtn.addEventListener("click", () => {
         if (!state.updateTools || state.updating || state.running) return;
-        const api = pyApi();
+        const api = bridge();
         if (!api || !api.updateTools) return;
         const ids = state.updateTools
           .filter((tool) => tool.outdated && tool.bundled)
@@ -574,7 +568,7 @@
     }
     if (el.updLaterBtn) {
       el.updLaterBtn.addEventListener("click", () => {
-        const api = pyApi();
+        const api = bridge();
         if (api && api.snoozeUpdates) api.snoozeUpdates();
         hideUpdates();
       });
@@ -763,7 +757,7 @@
     };
   }
   function saveSettings() {
-    const api = pyApi();
+    const api = bridge();
     if (api && api.saveSettings) api.saveSettings(gatherSettings());
   }
 
@@ -895,7 +889,7 @@
     renderStatus();
     log(t("boot.jobStarted", [new Date().toLocaleTimeString()]));
 
-    pyApi().startJob(opts).then(() => {
+    bridge().startJob(opts).then(() => {
       // The whole job state is pushed back through handleEvent.
     }).catch((e) => {
       finishRun(false, t("status.couldNotStart", [e && e.message ? e.message : e]));
@@ -905,7 +899,7 @@
   function cancelRun() {
     if (!state.running) return;
     log(t("boot.cancelling"), "note");
-    const api = pyApi();
+    const api = bridge();
     if (api && api.cancelJob) api.cancelJob();
   }
 
@@ -946,7 +940,7 @@
       if (state.running) {
         cancelRun();
       } else if (el.updatesModal && !el.updatesModal.hasAttribute("hidden")) {
-        const api = pyApi();
+        const api = bridge();
         if (api && api.snoozeUpdates) api.snoozeUpdates();
         hideUpdates();
       } else if (anyFieldError()) {
@@ -957,7 +951,7 @@
   });
 
   el.open.addEventListener("click", () => {
-    const api = pyApi();
+    const api = bridge();
     if (api && api.openFolder) api.openFolder((el.outDir.value || "").trim());
   });
 
@@ -967,7 +961,7 @@
     if (!link) return;
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      const api = pyApi();
+      const api = bridge();
       if (api && api.openExternal) api.openExternal(link.href);
       else window.open(link.href, "_blank");
     });
@@ -975,7 +969,7 @@
   wireExternal($("koFiLink"));
 
   el.browse.addEventListener("click", () => {
-    const api = pyApi();
+    const api = bridge();
     if (!api || !api.browseFolder) return;
     api.browseFolder().then((res) => {
       if (res) { el.outDir.value = res; saveSettings(); }
@@ -1120,7 +1114,7 @@
   const recheckBtn = $("recheckResolveBtn");
   if (recheckBtn) {
     recheckBtn.addEventListener("click", () => {
-      const api = pyApi();
+      const api = bridge();
       if (api && api.recheckResolve) {
         buttonFeedback(recheckBtn, t("status.checking"));
         api.recheckResolve().then((res) => {
@@ -1136,7 +1130,7 @@
   function autoCheckUpdates() {
     if (autoChecked) return;
     autoChecked = true;
-    const api = pyApi();
+    const api = bridge();
     if (!api || !api.checkUpdates) return;
     api.checkUpdates({ auto: true })
       .then((res) => {
@@ -1154,7 +1148,7 @@
   }
 
   function bootstrap() {
-    const api = pyApi();
+    const api = bridge();
     if (!api) return false;
     api.boot().then((cfg) => {
       if (cfg) {
