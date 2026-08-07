@@ -45,7 +45,7 @@ separate window to babysit, and no configuration beyond a single `install.bat`.
 ## How it works
 
 <p align="center">
-<img src="https://i.postimg.cc/wMWX5yrN/howitworks.png" alt="How it works" width="100%">
+<img src="https://i.postimg.cc/wMWX5yrN/howitworks.png" alt="How it works">
 </p>
 
 Downloads prefer H.264/AAC MP4, so encoding runs only when you opt in (re-encode,
